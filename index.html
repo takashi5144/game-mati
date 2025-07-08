@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ピクセルファーム・フロンティア 3D</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="ui-top">
+        <div class="resource-panel">
+            <div class="resource-item">
+                <span class="resource-icon">🌾</span>
+                <span id="food-count">食料: 100</span>
+            </div>
+            <div class="resource-item">
+                <span class="resource-icon">🪵</span>
+                <span id="wood-count">木材: 50</span>
+            </div>
+            <div class="resource-item">
+                <span class="resource-icon">💰</span>
+                <span id="money-count">資金: 1000</span>
+            </div>
+            <div class="resource-item">
+                <span class="resource-icon">👥</span>
+                <span id="population-count">人口: 0/0</span>
+            </div>
+        </div>
+        <div id="game-time">
+            <span id="day-display">Day 1</span>
+            <span id="season-display">Spring</span>
+        </div>
+    </div>
+
+    <div id="game-container"></div>
+
+    <div id="ui-bottom">
+        <div class="action-buttons">
+            <button class="action-btn" id="btn-farm" title="畑を作る (木材: 10)">
+                <span class="btn-icon">🌱</span>
+                <span class="btn-label">畑を作る</span>
+            </button>
+            <button class="action-btn" id="btn-house" title="家を建てる (木材: 20, 資金: 100)">
+                <span class="btn-icon">🏠</span>
+                <span class="btn-label">家を建てる</span>
+            </button>
+            <button class="action-btn" id="btn-lumbermill" title="製材所を建てる (木材: 30, 資金: 200)">
+                <span class="btn-icon">🪚</span>
+                <span class="btn-label">製材所</span>
+            </button>
+            <button class="action-btn" id="btn-demolish" title="建物を撤去">
+                <span class="btn-icon">🔨</span>
+                <span class="btn-label">撤去</span>
+            </button>
+        </div>
+        <div class="game-controls">
+            <button id="btn-pause">⏸️ 一時停止</button>
+            <button id="btn-speed">⏩ 速度: 1x</button>
+        </div>
+    </div>
+
+    <div id="info-panel" class="hidden">
+        <h3 id="info-title">情報</h3>
+        <div id="info-content"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="game-config.js"></script>
+    <script src="voxel-builder.js"></script>
+    <script src="game-world.js"></script>
+    <script src="resident-ai.js"></script>
+    <script src="resource-manager.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
