@@ -59,6 +59,7 @@ class PixelFarmGame {
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.shadowMap.autoUpdate = true;
         
         const container = document.getElementById('game-container');
         container.appendChild(this.renderer.domElement);

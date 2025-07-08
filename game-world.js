@@ -197,7 +197,15 @@ class GameWorld {
     completeBuilding(building) {
         // 建設サイトを削除して完成した建物を配置
         this.scene.remove(building.mesh);
-        building.mesh = this.voxelBuilder.createBuilding(building.type);
+        
+        // 畑の場合は初期成長段階を0に設定
+        if (building.type === 'farm') {
+            building.growthStage = 0;
+            building.mesh = this.voxelBuilder.createBuilding(building.type, 0);
+        } else {
+            building.mesh = this.voxelBuilder.createBuilding(building.type);
+        }
+        
         building.mesh.position.set(building.x, 0, building.z);
         this.scene.add(building.mesh);
         
@@ -266,6 +274,15 @@ class GameWorld {
             
             building.productionTimer += deltaTime;
             
+            // 畑の作物成長アニメーション
+            if (building.type === 'farm') {
+                if (!building.growthStage) building.growthStage = 0;
+                building.growthStage = Math.min(1.0, building.growthStage + deltaTime / building.config.productionInterval);
+                
+                // 作物の成長を視覚的に更新
+                this.updateFarmGrowth(building);
+            }
+            
             if (building.productionTimer >= building.config.productionInterval) {
                 building.productionTimer = 0;
                 
@@ -290,9 +307,22 @@ class GameWorld {
                     setTimeout(() => {
                         particles.forEach(p => this.scene.remove(p));
                     }, 1000);
+                    
+                    // 作物をリセット
+                    building.growthStage = 0;
                 }
             }
         });
+    }
+    
+    updateFarmGrowth(building) {
+        // 古い建物メッシュを削除
+        this.scene.remove(building.mesh);
+        
+        // 成長段階に応じた新しいメッシュを作成
+        building.mesh = this.voxelBuilder.createBuilding(building.type, building.growthStage);
+        building.mesh.position.set(building.x, 0, building.z);
+        this.scene.add(building.mesh);
     }
 
     getAvailableBuildings(type) {

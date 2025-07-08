@@ -9,17 +9,27 @@ class VoxelBuilder {
     }
 
     // ピクセルアート風のマテリアルを作成
-    createVoxelMaterial(color, emissive = 0x000000) {
-        const key = `${color}_${emissive}`;
+    createVoxelMaterial(color, emissive = 0x000000, textureData = null) {
+        const key = `${color}_${emissive}_${textureData ? 'textured' : 'plain'}`;
         if (this.materials.has(key)) {
             return this.materials.get(key);
         }
 
-        const material = new THREE.MeshLambertMaterial({
-            color: color,
-            emissive: emissive,
-            emissiveIntensity: 0.1
-        });
+        let material;
+        if (textureData) {
+            const texture = this.createPixelTexture(textureData.size, textureData.pixels);
+            material = new THREE.MeshLambertMaterial({
+                map: texture,
+                emissive: emissive,
+                emissiveIntensity: 0.1
+            });
+        } else {
+            material = new THREE.MeshLambertMaterial({
+                color: color,
+                emissive: emissive,
+                emissiveIntensity: 0.1
+            });
+        }
         
         this.materials.set(key, material);
         return material;
@@ -49,8 +59,8 @@ class VoxelBuilder {
     }
 
     // 基本的なボクセルブロックを作成
-    createVoxel(color, position = {x: 0, y: 0, z: 0}, scale = 1) {
-        const material = this.createVoxelMaterial(color);
+    createVoxel(color, position = {x: 0, y: 0, z: 0}, scale = 1, textureData = null) {
+        const material = this.createVoxelMaterial(color, 0x000000, textureData);
         const mesh = new THREE.Mesh(this.geometries.cube, material);
         
         mesh.position.set(position.x, position.y, position.z);
@@ -132,22 +142,41 @@ class VoxelBuilder {
     }
 
     // 建物を作成
-    createBuilding(buildingType) {
+    createBuilding(buildingType, growthStage = 1.0) {
         const group = new THREE.Group();
         const config = GAME_CONFIG.BUILDINGS[buildingType.toUpperCase()];
         
         if (buildingType === 'farm') {
-            // 畑のベース
-            const base = this.createVoxel(0x8B4513, { x: 0, y: 0.05, z: 0 });
+            // 畑のベース（土のテクスチャ付き）
+            const soilTexture = {
+                size: 8,
+                pixels: [
+                    ['#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00'],
+                    ['#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513'],
+                    ['#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410'],
+                    ['#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513'],
+                    ['#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00'],
+                    ['#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513'],
+                    ['#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410'],
+                    ['#7B3F00', '#8B4513', '#6B3410', '#8B4513', '#7B3F00', '#8B4513', '#6B3410', '#8B4513']
+                ]
+            };
+            
+            const base = this.createVoxel(0x8B4513, { x: 0, y: 0.05, z: 0 }, 1, soilTexture);
             base.scale.set(config.size.width, 0.1, config.size.height);
             group.add(base);
 
-            // 作物の列
+            // 作物の列（成長段階に応じて）
             for (let x = -0.5; x <= 0.5; x += 0.5) {
                 for (let z = -0.5; z <= 0.5; z += 0.5) {
-                    const crop = this.createVoxel(0x90EE90, { x: x, y: 0.2, z: z }, 0.2);
-                    crop.scale.y = 0.4;
-                    group.add(crop);
+                    if (growthStage > 0) {
+                        const cropHeight = 0.1 + (growthStage * 0.5);
+                        const cropColor = growthStage < 0.5 ? 0x90EE90 : (growthStage < 0.8 ? 0x7CFC00 : 0xFFD700);
+                        const crop = this.createVoxel(cropColor, { x: x, y: 0.1 + cropHeight/2, z: z }, 0.2);
+                        crop.scale.y = cropHeight;
+                        crop.userData.growthStage = growthStage;
+                        group.add(crop);
+                    }
                 }
             }
         } else if (buildingType === 'house') {
