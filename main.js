@@ -176,6 +176,138 @@ class PixelFarmGame {
                 }
             });
         });
+        
+        // ウィンドウシステム
+        document.getElementById('btn-open-window').addEventListener('click', () => {
+            document.getElementById('resident-window').classList.remove('hidden');
+            this.updateMarketTab();
+            this.updateStatsTab();
+        });
+        
+        document.querySelector('.window-close').addEventListener('click', () => {
+            document.getElementById('resident-window').classList.add('hidden');
+        });
+        
+        // タブシステム
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                const tabName = event.target.dataset.tab;
+                this.switchTab(tabName);
+            });
+        });
+        
+        // 売却ボタン
+        document.getElementById('btn-sell-all').addEventListener('click', () => {
+            const totalPrice = this.resourceManager.sellAllCrops();
+            if (totalPrice > 0) {
+                this.showNotification(`作物を売却しました！ +${totalPrice}円`);
+                this.updateMarketTab();
+            } else {
+                this.showNotification('売却できる作物がありません', 'error');
+            }
+        });
+    }
+    
+    switchTab(tabName) {
+        // すべてのタブを非表示
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // 選択されたタブを表示
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        
+        // タブに応じて内容を更新
+        if (tabName === 'market') {
+            this.updateMarketTab();
+        } else if (tabName === 'stats') {
+            this.updateStatsTab();
+        }
+    }
+    
+    updateMarketTab() {
+        const marketItems = document.getElementById('market-items');
+        marketItems.innerHTML = '';
+        
+        let totalValue = 0;
+        
+        Object.entries(this.resourceManager.resources.harvested).forEach(([cropId, amount]) => {
+            if (amount > 0) {
+                const cropPrices = { wheat: 50, tomato: 80, potato: 60 };
+                const price = cropPrices[cropId] || 50;
+                const value = price * amount;
+                totalValue += value;
+                
+                const item = document.createElement('div');
+                item.className = 'market-item';
+                item.innerHTML = `
+                    <div class="market-item-info">
+                        <strong>${this.getCropName(cropId)}</strong>
+                        <span>数量: ${amount} | 単価: ${price}円</span>
+                    </div>
+                    <div class="market-item-actions">
+                        <span>${value}円</span>
+                    </div>
+                `;
+                marketItems.appendChild(item);
+            }
+        });
+        
+        if (marketItems.children.length === 0) {
+            marketItems.innerHTML = '<p style="color: #999;">収穫した作物がありません</p>';
+        }
+        
+        document.getElementById('market-total').textContent = totalValue;
+    }
+    
+    updateStatsTab() {
+        document.getElementById('stat-residents').textContent = this.residentAI.getResidentCount();
+        document.getElementById('stat-buildings').textContent = this.gameWorld.buildings.size;
+        
+        let totalHarvested = 0;
+        Object.values(this.resourceManager.resources.harvested).forEach(amount => {
+            totalHarvested += amount;
+        });
+        document.getElementById('stat-harvested').textContent = totalHarvested;
+    }
+    
+    getCropName(cropId) {
+        const names = {
+            wheat: '小麦',
+            tomato: 'トマト',
+            potato: 'ジャガイモ'
+        };
+        return names[cropId] || cropId;
+    }
+    
+    showNotification(message, type = 'success') {
+        const notification = document.createElement('div');
+        const bgColor = type === 'error' ? 'rgba(255, 0, 0, 0.9)' : 'rgba(76, 175, 80, 0.9)';
+        notification.style.cssText = `
+            position: fixed;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: ${bgColor};
+            color: white;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 18px;
+            z-index: 1000;
+            border: 2px solid ${type === 'error' ? '#ff6666' : '#4CAF50'};
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.transition = 'opacity 0.5s';
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 500);
+        }, 3000);
     }
 
     spawnInitialResidents() {
@@ -194,31 +326,6 @@ class PixelFarmGame {
             // プレイヤーへの説明
             this.showNotification('住民をクリックして職業を割り当ててください');
         }, 1000);
-    }
-    
-    showNotification(message) {
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 120px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 15px 30px;
-            border-radius: 5px;
-            font-size: 18px;
-            z-index: 1000;
-            border: 2px solid #4CAF50;
-        `;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.style.transition = 'opacity 0.5s';
-            notification.style.opacity = '0';
-            setTimeout(() => notification.remove(), 500);
-        }, 3000);
     }
 
     placeInitialBuildings() {
@@ -283,9 +390,12 @@ class PixelFarmGame {
         this.selectedResident = this.residentAI.getResident(residentId);
         if (!this.selectedResident) return;
         
-        // 住民パネルを表示
-        const panel = document.getElementById('resident-panel');
-        panel.classList.remove('hidden');
+        // ウィンドウを開く
+        const window = document.getElementById('resident-window');
+        window.classList.remove('hidden');
+        
+        // 職業変更タブをアクティブに
+        this.switchTab('profession');
         
         // 住民情報を更新
         this.updateResidentPanel();
@@ -371,7 +481,7 @@ class PixelFarmGame {
                 this.gameWorld.setBuildMode(null);
                 this.gameWorld.deselectTile();
                 this.selectedResident = null;
-                document.getElementById('resident-panel').classList.add('hidden');
+                document.getElementById('resident-window').classList.add('hidden');
                 break;
         }
     }

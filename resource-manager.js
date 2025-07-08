@@ -4,7 +4,8 @@ class ResourceManager {
         this.resources = {
             food: GAME_CONFIG.INITIAL_RESOURCES.food,
             wood: GAME_CONFIG.INITIAL_RESOURCES.wood,
-            money: GAME_CONFIG.INITIAL_RESOURCES.money
+            money: GAME_CONFIG.INITIAL_RESOURCES.money,
+            harvested: {} // 収穫した作物を保存
         };
         
         this.population = 0;
@@ -176,12 +177,54 @@ class ResourceManager {
             }
         }
         
-        // お金の自然増加（税収的な）
-        if (this.population > 0) {
-            this.resources.money += this.population * 0.5 * deltaTime;
-        }
+        // 資金の自動増加は削除（作物売却のみで増やす）
         
         this.updateUI();
+    }
+    
+    // 作物を売却
+    sellCrops(cropId, amount) {
+        const harvestedAmount = this.resources.harvested[cropId] || 0;
+        const sellAmount = Math.min(amount, harvestedAmount);
+        
+        if (sellAmount <= 0) return 0;
+        
+        // 作物の価格を計算（仮の価格設定）
+        const cropPrices = {
+            wheat: 50,
+            tomato: 80,
+            potato: 60
+        };
+        
+        const price = cropPrices[cropId] || 50;
+        const totalPrice = price * sellAmount;
+        
+        // 売却処理
+        this.resources.harvested[cropId] -= sellAmount;
+        this.resources.money += totalPrice;
+        
+        logGameEvent('作物売却', {
+            crop: cropId,
+            amount: sellAmount,
+            price: totalPrice
+        });
+        
+        this.updateUI();
+        return totalPrice;
+    }
+    
+    // すべての作物を売却
+    sellAllCrops() {
+        let totalPrice = 0;
+        
+        Object.keys(this.resources.harvested).forEach(cropId => {
+            const amount = this.resources.harvested[cropId];
+            if (amount > 0) {
+                totalPrice += this.sellCrops(cropId, amount);
+            }
+        });
+        
+        return totalPrice;
     }
 
     // 住民を生成

@@ -64,21 +64,62 @@
         <div id="info-content"></div>
     </div>
     
-    <div id="resident-panel" class="hidden">
-        <h3 id="resident-name">住民情報</h3>
-        <div id="resident-info">
-            <p>職業: <span id="resident-profession"></span></p>
-            <p>状態: <span id="resident-state"></span></p>
-            <p>エネルギー: <span id="resident-energy"></span></p>
+    <!-- 住民管理ウィンドウ -->
+    <div id="resident-window" class="game-window hidden">
+        <div class="window-header">
+            <h3 class="window-title">住民管理</h3>
+            <button class="window-close">&times;</button>
         </div>
-        <div class="profession-buttons">
-            <h4>職業を変更:</h4>
-            <button class="profession-btn" data-profession="none">🧑 無職</button>
-            <button class="profession-btn" data-profession="farmer">👨‍🌾 農夫</button>
-            <button class="profession-btn" data-profession="builder">👷 建築家</button>
-            <button class="profession-btn" data-profession="lumberjack">🪓 木こり</button>
+        <div class="window-content">
+            <div class="window-tabs">
+                <button class="tab-btn active" data-tab="profession">職業変更</button>
+                <button class="tab-btn" data-tab="market">市場</button>
+                <button class="tab-btn" data-tab="stats">統計</button>
+            </div>
+            
+            <!-- 職業変更タブ -->
+            <div id="tab-profession" class="tab-content active">
+                <div id="resident-info">
+                    <h4 id="resident-name">住民を選択してください</h4>
+                    <p>職業: <span id="resident-profession">-</span></p>
+                    <p>状態: <span id="resident-state">-</span></p>
+                    <p>エネルギー: <span id="resident-energy">-</span></p>
+                </div>
+                <div class="profession-buttons">
+                    <h4>職業を変更:</h4>
+                    <button class="profession-btn" data-profession="none">🧑 無職</button>
+                    <button class="profession-btn" data-profession="farmer">👨‍🌾 農夫</button>
+                    <button class="profession-btn" data-profession="builder">👷 建築家</button>
+                    <button class="profession-btn" data-profession="lumberjack">🪓 木こり</button>
+                </div>
+            </div>
+            
+            <!-- 市場タブ -->
+            <div id="tab-market" class="tab-content">
+                <h4>作物を売却</h4>
+                <div id="market-items">
+                    <!-- 動的に生成される -->
+                </div>
+                <div class="market-total">
+                    <p>合計金額: <span id="market-total">0</span>円</p>
+                    <button id="btn-sell-all" class="market-btn">すべて売却</button>
+                </div>
+            </div>
+            
+            <!-- 統計タブ -->
+            <div id="tab-stats" class="tab-content">
+                <h4>統計情報</h4>
+                <div id="stats-content">
+                    <p>総住民数: <span id="stat-residents">0</span></p>
+                    <p>総建物数: <span id="stat-buildings">0</span></p>
+                    <p>総収穫量: <span id="stat-harvested">0</span></p>
+                </div>
+            </div>
         </div>
     </div>
+    
+    <!-- ウィンドウを開くボタン -->
+    <button id="btn-open-window" class="floating-btn">👥 住民管理</button>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="game-config.js"></script>
