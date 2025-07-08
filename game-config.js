@@ -61,7 +61,7 @@ const GAME_CONFIG = {
             workPlace: 'farm',
             moveSpeed: 0.05,
             workDuration: 5,
-            color: 0x228B22
+            color: 0x00FF00  // 明るい緑
         },
         builder: {
             name: '建築家',
@@ -69,7 +69,7 @@ const GAME_CONFIG = {
             workPlace: 'construction',
             moveSpeed: 0.04,
             workDuration: 3,
-            color: 0xFFD700
+            color: 0xFFA500  // オレンジ
         },
         lumberjack: {
             name: '木こり',
@@ -77,7 +77,7 @@ const GAME_CONFIG = {
             workPlace: 'lumbermill',
             moveSpeed: 0.045,
             workDuration: 6,
-            color: 0x8B4513
+            color: 0xFF0000  // 赤
         }
     },
 

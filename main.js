@@ -83,6 +83,9 @@ class PixelFarmGame {
         // 初期住民の生成
         this.spawnInitialResidents();
         
+        // 初期建物の配置
+        this.placeInitialBuildings();
+        
         // ゲームループの開始
         this.animate();
         
@@ -163,11 +166,57 @@ class PixelFarmGame {
     }
 
     spawnInitialResidents() {
-        // 初期の農夫を2人生成
+        // 初期の住民を生成
         setTimeout(() => {
+            // 農夫を3人
             this.resourceManager.spawnResident('farmer');
             this.resourceManager.spawnResident('farmer');
+            this.resourceManager.spawnResident('farmer');
+            
+            // 建築家を2人
+            this.resourceManager.spawnResident('builder');
+            this.resourceManager.spawnResident('builder');
+            
+            // 木こりを1人
+            this.resourceManager.spawnResident('lumberjack');
+            
+            logGameEvent('初期住民生成完了', { 
+                farmers: 3, 
+                builders: 2, 
+                lumberjacks: 1,
+                total: 6 
+            });
         }, 1000);
+    }
+
+    placeInitialBuildings() {
+        // 初期建物を配置（住民がすぐに働けるように）
+        setTimeout(() => {
+            // 畑を3つ配置
+            this.gameWorld.placeBuilding(8, 8, 'farm');
+            this.gameWorld.placeBuilding(11, 8, 'farm');
+            this.gameWorld.placeBuilding(14, 8, 'farm');
+            
+            // 家を2つ配置
+            this.gameWorld.placeBuilding(8, 11, 'house');
+            this.gameWorld.placeBuilding(11, 11, 'house');
+            
+            // 製材所を1つ配置
+            this.gameWorld.placeBuilding(14, 11, 'lumbermill');
+            
+            // 建物をすぐに完成状態にする
+            this.gameWorld.buildings.forEach(building => {
+                if (!building.isComplete) {
+                    this.gameWorld.completeBuilding(building);
+                }
+            });
+            
+            logGameEvent('初期建物配置完了', { 
+                farms: 3, 
+                houses: 2, 
+                lumbermills: 1 
+            });
+        }, 500);
     }
 
     onMouseClick(event) {
