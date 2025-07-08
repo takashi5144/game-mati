@@ -55,6 +55,14 @@ const GAME_CONFIG = {
 
     // 住民の職業
     PROFESSIONS: {
+        none: {
+            name: '無職',
+            icon: '🧑',
+            workPlace: null,
+            moveSpeed: 0.04,
+            workDuration: 0,
+            color: 0x808080  // グレー
+        },
         farmer: {
             name: '農夫',
             icon: '👨‍🌾',

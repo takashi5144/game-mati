@@ -8,14 +8,19 @@ class ResidentAI {
         this.residentId = 0;
     }
 
-    createResident(profession, spawnPosition) {
+    createResident(profession = 'none', spawnPosition) {
         const id = `resident_${this.residentId++}`;
         const mesh = this.voxelBuilder.createCharacter(profession);
         mesh.position.set(spawnPosition.x, 0, spawnPosition.z);
         this.scene.add(mesh);
         
+        // メッシュにIDを保存（クリック検出用）
+        mesh.userData.residentId = id;
+        mesh.userData.type = 'resident';
+        
         const resident = {
             id: id,
+            name: `住民${this.residentId}`,
             profession: profession,
             mesh: mesh,
             position: { x: spawnPosition.x, z: spawnPosition.z },
@@ -25,7 +30,8 @@ class ResidentAI {
             stateTimer: 0,
             path: [],
             pathIndex: 0,
-            workProgress: 0
+            workProgress: 0,
+            energy: 100
         };
         
         this.residents.set(id, resident);
@@ -33,6 +39,7 @@ class ResidentAI {
         logGameEvent('住民誕生', { 
             profession: profession, 
             id: id,
+            name: resident.name,
             position: spawnPosition 
         });
         
@@ -61,8 +68,13 @@ class ResidentAI {
         // アイドルアニメーション（上下に揺れる）
         resident.mesh.position.y = Math.sin(resident.stateTimer * 2) * 0.05;
         
-        // 仕事を探す
-        if (resident.stateTimer > 2) {
+        // エネルギー回復
+        if (resident.energy < 100) {
+            resident.energy = Math.min(100, resident.energy + deltaTime * 5);
+        }
+        
+        // 仕事を探す（職業がある場合のみ）
+        if (resident.stateTimer > 2 && resident.profession !== 'none') {
             resident.stateTimer = 0;
             this.findWork(resident);
         }
@@ -269,5 +281,48 @@ class ResidentAI {
         this.residents.delete(residentId);
         
         logGameEvent('住民削除', { id: residentId });
+    }
+
+    changeProfession(residentId, newProfession) {
+        const resident = this.residents.get(residentId);
+        if (!resident) return false;
+        
+        // 現在の職場から離れる
+        if (resident.workplace) {
+            resident.workplace.worker = null;
+            resident.workplace = null;
+        }
+        
+        // 職業を変更
+        const oldProfession = resident.profession;
+        resident.profession = newProfession;
+        
+        // 外見を更新
+        this.scene.remove(resident.mesh);
+        resident.mesh = this.voxelBuilder.createCharacter(newProfession);
+        resident.mesh.position.set(resident.position.x, 0, resident.position.z);
+        resident.mesh.userData.residentId = residentId;
+        resident.mesh.userData.type = 'resident';
+        this.scene.add(resident.mesh);
+        
+        // 状態をリセット
+        resident.state = 'idle';
+        resident.target = null;
+        resident.path = [];
+        resident.pathIndex = 0;
+        resident.workProgress = 0;
+        
+        logGameEvent('職業変更', { 
+            residentId: residentId,
+            name: resident.name,
+            oldProfession: oldProfession,
+            newProfession: newProfession
+        });
+        
+        return true;
+    }
+
+    getResident(residentId) {
+        return this.residents.get(residentId);
     }
 }

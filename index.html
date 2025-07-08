@@ -63,6 +63,22 @@
         <h3 id="info-title">情報</h3>
         <div id="info-content"></div>
     </div>
+    
+    <div id="resident-panel" class="hidden">
+        <h3 id="resident-name">住民情報</h3>
+        <div id="resident-info">
+            <p>職業: <span id="resident-profession"></span></p>
+            <p>状態: <span id="resident-state"></span></p>
+            <p>エネルギー: <span id="resident-energy"></span></p>
+        </div>
+        <div class="profession-buttons">
+            <h4>職業を変更:</h4>
+            <button class="profession-btn" data-profession="none">🧑 無職</button>
+            <button class="profession-btn" data-profession="farmer">👨‍🌾 農夫</button>
+            <button class="profession-btn" data-profession="builder">👷 建築家</button>
+            <button class="profession-btn" data-profession="lumberjack">🪓 木こり</button>
+        </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="game-config.js"></script>

@@ -18,6 +18,8 @@ class PixelFarmGame {
         this.currentSeason = 'SPRING';
         this.seasonTimer = 0;
         
+        this.selectedResident = null;
+        
         this.clock = new THREE.Clock();
         
         this.init();
@@ -163,30 +165,60 @@ class PixelFarmGame {
         
         // キーボードショートカット
         document.addEventListener('keydown', (event) => this.onKeyDown(event));
+        
+        // 職業変更ボタン
+        document.querySelectorAll('.profession-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                if (this.selectedResident) {
+                    const newProfession = event.target.dataset.profession;
+                    this.residentAI.changeProfession(this.selectedResident.id, newProfession);
+                    this.updateResidentPanel();
+                }
+            });
+        });
     }
 
     spawnInitialResidents() {
-        // 初期の住民を生成
+        // 初期の住民を生成（全員無職）
         setTimeout(() => {
-            // 農夫を3人
-            this.resourceManager.spawnResident('farmer');
-            this.resourceManager.spawnResident('farmer');
-            this.resourceManager.spawnResident('farmer');
-            
-            // 建築家を2人
-            this.resourceManager.spawnResident('builder');
-            this.resourceManager.spawnResident('builder');
-            
-            // 木こりを1人
-            this.resourceManager.spawnResident('lumberjack');
+            // 6人の無職住民を生成
+            for (let i = 0; i < 6; i++) {
+                this.resourceManager.spawnResident('none');
+            }
             
             logGameEvent('初期住民生成完了', { 
-                farmers: 3, 
-                builders: 2, 
-                lumberjacks: 1,
-                total: 6 
+                total: 6,
+                profession: '無職' 
             });
+            
+            // プレイヤーへの説明
+            this.showNotification('住民をクリックして職業を割り当ててください');
         }, 1000);
+    }
+    
+    showNotification(message) {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 18px;
+            z-index: 1000;
+            border: 2px solid #4CAF50;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.transition = 'opacity 0.5s';
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 500);
+        }, 3000);
     }
 
     placeInitialBuildings() {
@@ -230,12 +262,69 @@ class PixelFarmGame {
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
         
         if (intersects.length > 0) {
+            const clickedObject = intersects[0].object;
+            
+            // 住民をクリックした場合
+            if (clickedObject.userData && clickedObject.userData.type === 'resident') {
+                this.selectResident(clickedObject.userData.residentId);
+                return;
+            }
+            
+            // タイルをクリックした場合
             const point = intersects[0].point;
             const tileX = Math.floor(point.x + 0.5);
             const tileZ = Math.floor(point.z + 0.5);
             
             this.gameWorld.handleClick(tileX, tileZ);
         }
+    }
+    
+    selectResident(residentId) {
+        this.selectedResident = this.residentAI.getResident(residentId);
+        if (!this.selectedResident) return;
+        
+        // 住民パネルを表示
+        const panel = document.getElementById('resident-panel');
+        panel.classList.remove('hidden');
+        
+        // 住民情報を更新
+        this.updateResidentPanel();
+        
+        // 建物情報パネルを隠す
+        document.getElementById('info-panel').classList.add('hidden');
+        
+        logGameEvent('住民選択', { 
+            id: residentId,
+            name: this.selectedResident.name,
+            profession: this.selectedResident.profession 
+        });
+    }
+    
+    updateResidentPanel() {
+        if (!this.selectedResident) return;
+        
+        document.getElementById('resident-name').textContent = this.selectedResident.name;
+        document.getElementById('resident-profession').textContent = GAME_CONFIG.PROFESSIONS[this.selectedResident.profession].name;
+        document.getElementById('resident-state').textContent = this.getResidentStateText(this.selectedResident.state);
+        document.getElementById('resident-energy').textContent = `${Math.floor(this.selectedResident.energy)}/100`;
+        
+        // 職業ボタンの状態を更新
+        document.querySelectorAll('.profession-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.profession === this.selectedResident.profession) {
+                btn.classList.add('active');
+            }
+        });
+    }
+    
+    getResidentStateText(state) {
+        const stateTexts = {
+            'idle': '待機中',
+            'moving': '移動中',
+            'working': '作業中',
+            'resting': '休憩中'
+        };
+        return stateTexts[state] || state;
     }
 
     onMouseMove(event) {
@@ -281,6 +370,8 @@ class PixelFarmGame {
             case 'Escape':
                 this.gameWorld.setBuildMode(null);
                 this.gameWorld.deselectTile();
+                this.selectedResident = null;
+                document.getElementById('resident-panel').classList.add('hidden');
                 break;
         }
     }
@@ -362,6 +453,11 @@ class PixelFarmGame {
             this.gameWorld.updateProduction(adjustedDelta);
             this.resourceManager.update(adjustedDelta);
             this.updateSeasons(adjustedDelta);
+            
+            // 選択中の住民情報を更新
+            if (this.selectedResident) {
+                this.updateResidentPanel();
+            }
             
             // パーティクルアニメーションなどの更新
             // TODO: パーティクルシステムの実装
