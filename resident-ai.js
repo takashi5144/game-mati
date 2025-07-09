@@ -349,18 +349,38 @@ class ResidentAI {
                 break;
                 
             case 'TILLED':
-                // 種をまく
+                // 種をまく（ジャガイモの種を使用）
                 if (farm.stateTimer >= stateConfig.duration) {
-                    this.gameWorld.changeFarmState(farm, 'SEEDED');
-                    this.createWorkEffect(farm, 'seed');
+                    if (window.resourceManager && window.resourceManager.hasSeeds('potato')) {
+                        window.resourceManager.useSeeds('potato');
+                        this.gameWorld.changeFarmState(farm, 'SEEDED');
+                        this.createWorkEffect(farm, 'seed');
+                    } else {
+                        // 種がない場合は待機
+                        resident.state = 'idle';
+                        resident.workplace = null;
+                        if (window.game) {
+                            window.game.showNotification('種が不足しています！', 'error');
+                        }
+                    }
                 }
                 break;
                 
             case 'SEEDED':
-                // 水やり
+                // 水やり（じょうろに水が必要）
                 if (farm.stateTimer >= stateConfig.duration) {
-                    this.gameWorld.changeFarmState(farm, 'WATERED');
-                    this.createWorkEffect(farm, 'water');
+                    if (window.resourceManager && window.resourceManager.wateringCanFilled) {
+                        window.resourceManager.useWateringCan();
+                        this.gameWorld.changeFarmState(farm, 'WATERED');
+                        this.createWorkEffect(farm, 'water');
+                    } else {
+                        // 水がない場合は水を汲みに行く
+                        resident.state = 'idle';
+                        resident.workplace = null;
+                        if (window.game) {
+                            window.game.showNotification('川で水を汲んでください！', 'error');
+                        }
+                    }
                 }
                 break;
                 
@@ -372,23 +392,54 @@ class ResidentAI {
                 break;
                 
             case 'SPROUTED':
-                // 成長を見守る
-                if (farm.stateTimer >= stateConfig.duration) {
-                    this.gameWorld.changeFarmState(farm, 'GROWING_EARLY');
+                // 成長を見守る（毎日水が必要）
+                if (window.resourceManager && window.resourceManager.wateringCanFilled) {
+                    window.resourceManager.useWateringCan();
+                    this.createWorkEffect(farm, 'water');
+                    if (farm.stateTimer >= stateConfig.duration) {
+                        this.gameWorld.changeFarmState(farm, 'GROWING_EARLY');
+                    }
+                } else {
+                    // 水がない場合は成長が止まる
+                    resident.state = 'idle';
+                    resident.workplace = null;
+                    if (window.game) {
+                        window.game.showNotification('成長中の作物に水が必要です！', 'error');
+                    }
                 }
                 break;
                 
             case 'GROWING_EARLY':
-                // 成長中期へ
-                if (farm.stateTimer >= stateConfig.duration) {
-                    this.gameWorld.changeFarmState(farm, 'GROWING_MID');
+                // 成長中期へ（毎日水が必要）
+                if (window.resourceManager && window.resourceManager.wateringCanFilled) {
+                    window.resourceManager.useWateringCan();
+                    this.createWorkEffect(farm, 'water');
+                    if (farm.stateTimer >= stateConfig.duration) {
+                        this.gameWorld.changeFarmState(farm, 'GROWING_MID');
+                    }
+                } else {
+                    resident.state = 'idle';
+                    resident.workplace = null;
+                    if (window.game) {
+                        window.game.showNotification('成長中の作物に水が必要です！', 'error');
+                    }
                 }
                 break;
                 
             case 'GROWING_MID':
-                // 収穫可能へ
-                if (farm.stateTimer >= stateConfig.duration) {
-                    this.gameWorld.changeFarmState(farm, 'READY');
+                // 収穫可能へ（毎日水が必要）
+                if (window.resourceManager && window.resourceManager.wateringCanFilled) {
+                    window.resourceManager.useWateringCan();
+                    this.createWorkEffect(farm, 'water');
+                    if (farm.stateTimer >= stateConfig.duration) {
+                        this.gameWorld.changeFarmState(farm, 'READY');
+                    }
+                } else {
+                    resident.state = 'idle';
+                    resident.workplace = null;
+                    if (window.game) {
+                        window.game.showNotification('成長中の作物に水が必要です！', 'error');
+                    }
                 }
                 break;
                 

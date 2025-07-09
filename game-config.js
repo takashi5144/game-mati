@@ -105,7 +105,23 @@ const GAME_CONFIG = {
     INITIAL_RESOURCES: {
         food: 100,
         wood: 50,
-        money: 1000
+        money: 1000,
+        seeds: {
+            potato: 10
+        },
+        tools: {
+            wateringCan: 1
+        }
+    },
+    
+    // 種の種類
+    SEED_TYPES: {
+        potato: {
+            name: 'ジャガイモの種',
+            growthTime: 15,
+            production: 8,
+            color: 0xDEB887
+        }
     },
 
     // ゲームスピード設定

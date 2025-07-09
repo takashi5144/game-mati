@@ -5,8 +5,12 @@ class ResourceManager {
             food: GAME_CONFIG.INITIAL_RESOURCES.food,
             wood: GAME_CONFIG.INITIAL_RESOURCES.wood,
             money: GAME_CONFIG.INITIAL_RESOURCES.money,
-            harvested: {} // 収穫した作物を保存
+            harvested: {}, // 収穫した作物を保存
+            seeds: { ...GAME_CONFIG.INITIAL_RESOURCES.seeds },
+            tools: { ...GAME_CONFIG.INITIAL_RESOURCES.tools }
         };
+        
+        this.wateringCanFilled = false; // じょうろに水が入っているか
         
         this.population = 0;
         this.maxPopulation = 10; // 初期の人口上限を10に設定
@@ -113,6 +117,8 @@ class ResourceManager {
         document.getElementById('wood-count').textContent = `木材: ${Math.floor(this.resources.wood)}`;
         document.getElementById('money-count').textContent = `資金: ${Math.floor(this.resources.money)}`;
         document.getElementById('population-count').textContent = `人口: ${this.population}/${this.maxPopulation}`;
+        document.getElementById('seed-count').textContent = `種: ${this.resources.seeds.potato || 0}`;
+        document.getElementById('water-status').textContent = `じょうろ: ${this.wateringCanFilled ? '満タン' : '空'}`;
         
         // ボタンの有効/無効を更新
         this.updateButtonStates();
@@ -259,6 +265,43 @@ class ResourceManager {
             buildings: window.gameWorld ? window.gameWorld.buildings.size : 0,
             residents: window.residentAI ? window.residentAI.residents.size : 0
         };
+    }
+    
+    // じょうろに水を汲む
+    fillWateringCan() {
+        this.wateringCanFilled = true;
+        this.updateUI();
+        
+        if (window.game) {
+            window.game.showNotification('じょうろに水を汲みました！');
+        }
+        
+        logGameEvent('水汲み', { wateringCanFilled: true });
+    }
+    
+    // じょうろの水を使う
+    useWateringCan() {
+        if (this.wateringCanFilled) {
+            this.wateringCanFilled = false;
+            this.updateUI();
+            return true;
+        }
+        return false;
+    }
+    
+    // 種を使う
+    useSeeds(seedType, amount = 1) {
+        if (this.resources.seeds[seedType] >= amount) {
+            this.resources.seeds[seedType] -= amount;
+            this.updateUI();
+            return true;
+        }
+        return false;
+    }
+    
+    // 種があるかチェック
+    hasSeeds(seedType) {
+        return this.resources.seeds[seedType] > 0;
     }
 }
 

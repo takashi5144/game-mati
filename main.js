@@ -702,6 +702,7 @@ class PixelFarmGame {
         if (this.seasonTimer % 1 < deltaTime) {
             this.currentDay++;
             this.updateTimeDisplay();
+            this.onNewDay();
         }
     }
 
@@ -711,6 +712,41 @@ class PixelFarmGame {
         
         dayDisplay.textContent = `Day ${this.currentDay}`;
         seasonDisplay.textContent = GAME_CONFIG.SEASONS[this.currentSeason].name;
+    }
+    
+    onNewDay() {
+        // 新しい日の処理
+        logGameEvent('新しい日', { day: this.currentDay });
+        
+        // すべての畑を乾かす
+        if (this.gameWorld) {
+            this.gameWorld.buildings.forEach(building => {
+                if (building.type === 'farm' && building.isComplete) {
+                    // 水やり済みの畑を種まき済みに戻す（乾く）
+                    if (building.farmState === 'WATERED') {
+                        this.gameWorld.changeFarmState(building, 'SEEDED');
+                        logGameEvent('畑が乾いた', { 
+                            farmId: building.id,
+                            position: { x: building.x, z: building.z }
+                        });
+                    }
+                    // 成長中の畑も水が必要になる
+                    else if (['SPROUTED', 'GROWING_EARLY', 'GROWING_MID'].includes(building.farmState)) {
+                        // 成長段階を1つ戻す（水不足）
+                        const previousState = building.farmState === 'SPROUTED' ? 'SEEDED' :
+                                            building.farmState === 'GROWING_EARLY' ? 'SPROUTED' :
+                                            'GROWING_EARLY';
+                        this.gameWorld.changeFarmState(building, previousState);
+                        logGameEvent('水不足で成長が止まった', { 
+                            farmId: building.id,
+                            position: { x: building.x, z: building.z }
+                        });
+                    }
+                }
+            });
+            
+            this.showNotification('新しい日が始まりました。畑に水やりが必要です！');
+        }
     }
 
     animate() {

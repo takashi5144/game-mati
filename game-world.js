@@ -28,9 +28,19 @@ class GameWorld {
                     tileType = 'dirt';
                 }
                 
-                // 川を作る
-                if ((x === 10 && z >= 5 && z <= 15) || 
-                    (z === 10 && x >= 5 && x <= 15)) {
+                // 川を作る（マップサイズに応じて調整）
+                const centerX = Math.floor(size / 2);
+                const centerZ = Math.floor(size / 2);
+                const riverWidth = 2;
+                const riverStart = Math.floor(size * 0.2);
+                const riverEnd = Math.floor(size * 0.8);
+                
+                // 曲がりくねった川を生成
+                const riverCurve = Math.sin((z / size) * Math.PI * 2) * 3;
+                const riverX = centerX + riverCurve;
+                
+                if ((x >= riverX - riverWidth && x <= riverX + riverWidth && z >= riverStart && z <= riverEnd) ||
+                    (z >= centerZ - riverWidth && z <= centerZ + riverWidth && x >= riverStart && x <= riverEnd)) {
                     tileType = 'water';
                 }
                 
@@ -383,6 +393,8 @@ class GameWorld {
     }
 
     handleClick(x, z) {
+        const tile = this.getTileAt(x, z);
+        
         if (this.buildMode === 'demolish') {
             this.demolishBuilding(x, z);
             this.setBuildMode(null);
@@ -395,9 +407,40 @@ class GameWorld {
                 } 
             });
             window.dispatchEvent(event);
+        } else if (tile && tile.type === 'water' && window.resourceManager) {
+            // 川をクリックしたらじょうろに水を汲む
+            window.resourceManager.fillWateringCan();
+            this.createWaterFillEffect(x, z);
         } else {
             this.selectTile(x, z);
         }
+    }
+    
+    // 水汲みエフェクト
+    createWaterFillEffect(x, z) {
+        const particles = [];
+        for (let i = 0; i < 5; i++) {
+            const geometry = new THREE.SphereGeometry(0.05, 6, 6);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x4169E1,
+                transparent: true,
+                opacity: 0.7,
+                emissive: 0x4169E1,
+                emissiveIntensity: 0.2
+            });
+            const droplet = new THREE.Mesh(geometry, material);
+            droplet.position.set(
+                x + (Math.random() - 0.5) * 0.5,
+                1 + Math.random() * 0.5,
+                z + (Math.random() - 0.5) * 0.5
+            );
+            this.scene.add(droplet);
+            particles.push(droplet);
+        }
+        
+        setTimeout(() => {
+            particles.forEach(p => this.scene.remove(p));
+        }, 1000);
     }
     
     expandMap(newSize) {
