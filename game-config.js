@@ -71,6 +71,12 @@ const GAME_CONFIG = {
             buildTime: 5,
             size: { width: 3, height: 3 },
             storage: true,
+            storageCapacity: {
+                wood: 100,
+                food: 100,
+                seeds: 50,
+                tools: 10
+            },
             color: 0x8B4513
         }
     },

@@ -381,7 +381,17 @@ class GameWorld {
         if (this.buildMode === 'demolish') {
             this.demolishBuilding(x, z);
             this.setBuildMode(null);
-        } else if (this.buildMode && this.buildMode !== 'demolish') {
+        } else if (this.buildMode === 'harvest') {
+            // 伐採モード
+            if (tile && tile.type === 'forest') {
+                this.harvestTree(tile);
+            } else {
+                if (window.game) {
+                    window.game.showNotification('森のタイルを選択してください', 'error');
+                }
+            }
+            this.setBuildMode(null);
+        } else if (this.buildMode && this.buildMode !== 'demolish' && this.buildMode !== 'harvest') {
             const event = new CustomEvent('buildingPlaced', { 
                 detail: { 
                     type: this.buildMode,
@@ -466,6 +476,120 @@ class GameWorld {
             oldSize: oldSize, 
             newSize: newSize,
             newTiles: (newSize * newSize) - (oldSize * oldSize)
+        });
+    }
+    
+    // 木を伐採する
+    harvestTree(tile) {
+        if (!tile || tile.type !== 'forest') return;
+        
+        // 伐採タスクを作成
+        const harvestTask = {
+            id: `harvest_${Date.now()}`,
+            type: 'harvest_tree',
+            position: { x: tile.x, z: tile.z },
+            tile: tile,
+            assigned: false
+        };
+        
+        // グローバル変数として公開（木こりが見つけられるように）
+        if (!window.harvestTasks) {
+            window.harvestTasks = [];
+        }
+        window.harvestTasks.push(harvestTask);
+        
+        // 伐採マーカーを表示
+        const markerGeometry = new THREE.RingGeometry(0.3, 0.4, 8);
+        const markerMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xFF0000,
+            side: THREE.DoubleSide
+        });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.rotation.x = -Math.PI / 2;
+        marker.position.set(tile.x, 0.1, tile.z);
+        marker.name = `harvest_marker_${harvestTask.id}`;
+        this.scene.add(marker);
+        
+        // タスクにマーカーを紐付け
+        harvestTask.marker = marker;
+        
+        logGameEvent('伐採タスク作成', {
+            position: { x: tile.x, z: tile.z },
+            taskId: harvestTask.id
+        });
+        
+        if (window.game) {
+            window.game.showNotification('伐採対象を指定しました', 'success');
+        }
+    }
+    
+    // 伐採完了（木こりが呼び出す）
+    completeHarvest(tile) {
+        if (!tile || tile.type !== 'forest') return;
+        
+        // タイルを草地に変更
+        tile.type = 'grass';
+        
+        // 古いメッシュを削除
+        this.scene.remove(tile.mesh);
+        
+        // 新しい草地タイルを作成
+        const builder = window.game.useRealisticMode ? window.game.realisticBuilder : window.game.voxelBuilder;
+        tile.mesh = builder.createGroundTile('grass', tile.x, tile.z);
+        this.scene.add(tile.mesh);
+        
+        // 伐採エフェクト
+        const particles = [];
+        for (let i = 0; i < 10; i++) {
+            const particleGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            const particleMaterial = new THREE.MeshStandardMaterial({
+                color: 0x8B4513,
+                emissive: 0x8B4513,
+                emissiveIntensity: 0.2
+            });
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.set(
+                tile.x + (Math.random() - 0.5) * 0.5,
+                1 + Math.random() * 0.5,
+                tile.z + (Math.random() - 0.5) * 0.5
+            );
+            particle.velocity = {
+                x: (Math.random() - 0.5) * 0.2,
+                y: Math.random() * 0.3,
+                z: (Math.random() - 0.5) * 0.2
+            };
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // パーティクルアニメーション
+        let animationTime = 0;
+        const animate = () => {
+            animationTime += 0.016;
+            let allFinished = true;
+            
+            particles.forEach(p => {
+                if (p.position.y > 0.1) {
+                    p.position.x += p.velocity.x * 0.016;
+                    p.position.y += p.velocity.y * 0.016;
+                    p.position.z += p.velocity.z * 0.016;
+                    p.velocity.y -= 0.5 * 0.016; // 重力
+                    p.rotation.x += 0.1;
+                    p.rotation.y += 0.1;
+                    allFinished = false;
+                }
+            });
+            
+            if (!allFinished && animationTime < 2) {
+                requestAnimationFrame(animate);
+            } else {
+                particles.forEach(p => this.scene.remove(p));
+            }
+        };
+        animate();
+        
+        logGameEvent('伐採完了', {
+            position: { x: tile.x, z: tile.z }
         });
     }
 }

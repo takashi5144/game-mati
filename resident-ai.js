@@ -63,6 +63,9 @@ class ResidentAI {
                 case 'working':
                     this.updateWorking(resident, deltaTime);
                     break;
+                case 'harvesting':
+                    this.updateHarvesting(resident, deltaTime);
+                    break;
             }
         });
     }
@@ -237,7 +240,33 @@ class ResidentAI {
                 }
             }
         } else if (resident.profession === 'lumberjack') {
-            // 木こりは製材所を探す
+            // 木こりはまず伐採タスクを探す
+            if (window.harvestTasks && window.harvestTasks.length > 0) {
+                const unassignedTasks = window.harvestTasks.filter(task => !task.assigned);
+                if (unassignedTasks.length > 0) {
+                    // 最も近い伐採タスクを選択
+                    let nearestTask = null;
+                    let minDistance = Infinity;
+                    
+                    unassignedTasks.forEach(task => {
+                        const dx = task.position.x - resident.position.x;
+                        const dz = task.position.z - resident.position.z;
+                        const distance = Math.sqrt(dx * dx + dz * dz);
+                        
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            nearestTask = task;
+                        }
+                    });
+                    
+                    if (nearestTask) {
+                        this.assignHarvestTask(resident, nearestTask);
+                        return;
+                    }
+                }
+            }
+            
+            // 伐採タスクがない場合は製材所で働く
             const lumbermills = this.gameWorld.getAvailableBuildings('lumbermill');
             if (lumbermills.length > 0) {
                 const nearestMill = this.findNearestBuilding(resident, lumbermills);
@@ -680,15 +709,26 @@ class ResidentAI {
                         }
                     }
                     break;
+                case 'axe':
+                    resident.currentTool = 'axe';
+                    if (window.game) {
+                        window.game.showNotification(`${resident.name}が斧を取得しました`, 'success');
+                    }
+                    break;
             }
             
-            // 元の作業場所に戻る
-            resident.workplace = savedWorkplace;
-            if (savedWorkplace) {
-                resident.target = { x: savedWorkplace.x, z: savedWorkplace.z };
-                resident.path = this.findPath(resident.position, resident.target);
-                resident.pathIndex = 0;
-                resident.state = 'moving';
+            // 元の作業場所に戻る（伐採タスクの場合は特別処理）
+            if (toolType === 'axe' && resident.harvestTask) {
+                // 伐採タスクに戻る
+                this.assignHarvestTask(resident, resident.harvestTask);
+            } else {
+                resident.workplace = savedWorkplace;
+                if (savedWorkplace) {
+                    resident.target = { x: savedWorkplace.x, z: savedWorkplace.z };
+                    resident.path = this.findPath(resident.position, resident.target);
+                    resident.pathIndex = 0;
+                    resident.state = 'moving';
+                }
             }
         };
     }
@@ -741,6 +781,118 @@ class ResidentAI {
                 resident.pathIndex = 0;
                 resident.state = 'moving';
             }
+        };
+    }
+    
+    // 伐採タスクを割り当て
+    assignHarvestTask(resident, task) {
+        task.assigned = true;
+        resident.harvestTask = task;
+        
+        // 斧を持っていない場合は納屋に取りに行く
+        if (!resident.currentTool || resident.currentTool !== 'axe') {
+            this.goToBarnForTool(resident, 'axe');
+            return;
+        }
+        
+        // 伐採場所に移動
+        resident.target = task.position;
+        resident.path = this.findPath(resident.position, resident.target);
+        resident.pathIndex = 0;
+        resident.state = 'moving';
+        
+        // 伐採場所に到着したら伐採開始
+        resident.onArrival = () => {
+            resident.state = 'harvesting';
+            resident.workProgress = 0;
+        };
+        
+        logGameEvent('伐採タスク割り当て', {
+            residentId: resident.id,
+            taskId: task.id,
+            position: task.position
+        });
+    }
+    
+    // 伐採作業を更新
+    updateHarvesting(resident, deltaTime) {
+        if (!resident.harvestTask) {
+            resident.state = 'idle';
+            return;
+        }
+        
+        resident.workProgress += deltaTime;
+        
+        // 伐採アニメーション（斧を振る）
+        const swingSpeed = 3;
+        const swingAmount = Math.sin(resident.workProgress * swingSpeed) * 0.5;
+        resident.mesh.rotation.z = swingAmount * 0.3;
+        
+        // 伐採完了（3秒かかる）
+        if (resident.workProgress >= 3) {
+            const task = resident.harvestTask;
+            
+            // 木を伐採
+            this.gameWorld.completeHarvest(task.tile);
+            
+            // マーカーを削除
+            if (task.marker) {
+                this.scene.remove(task.marker);
+            }
+            
+            // タスクリストから削除
+            const taskIndex = window.harvestTasks.indexOf(task);
+            if (taskIndex > -1) {
+                window.harvestTasks.splice(taskIndex, 1);
+            }
+            
+            // 木材を持つ
+            resident.carryingWood = 5; // 5個の木材を運ぶ
+            resident.harvestTask = null;
+            
+            // 納屋に木材を運ぶ
+            this.goToBarnWithWood(resident);
+            
+            if (window.game) {
+                window.game.showNotification(`${resident.name}が木を伐採しました`, 'success');
+            }
+        }
+    }
+    
+    // 納屋に木材を運ぶ
+    goToBarnWithWood(resident) {
+        const barn = this.findBarn();
+        if (!barn) {
+            // 納屋がない場合は、その場で資源に追加
+            if (window.resourceManager && resident.carryingWood) {
+                const woodAmount = resident.carryingWood;
+                window.resourceManager.addResources({ wood: woodAmount });
+                resident.carryingWood = 0;
+                if (window.game) {
+                    window.game.showNotification(`木材 +${woodAmount}`, 'success');
+                }
+            }
+            resident.state = 'idle';
+            return;
+        }
+        
+        // 納屋に移動
+        resident.target = { x: barn.x, z: barn.z };
+        resident.path = this.findPath(resident.position, resident.target);
+        resident.pathIndex = 0;
+        resident.state = 'moving';
+        
+        // 納屋に到着したら木材を収納
+        resident.onArrival = () => {
+            if (window.resourceManager && resident.carryingWood) {
+                const woodAmount = resident.carryingWood;
+                window.resourceManager.addResources({ wood: woodAmount });
+                if (window.game) {
+                    window.game.showNotification(`納屋に木材を収納しました +${woodAmount}`, 'success');
+                }
+                resident.carryingWood = 0;
+            }
+            resident.state = 'idle';
         };
     }
 }

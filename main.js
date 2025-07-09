@@ -210,6 +210,10 @@ class PixelFarmGame {
             this.gameWorld.setBuildMode('barn');
         });
         
+        document.getElementById('btn-harvest-tree').addEventListener('click', () => {
+            this.gameWorld.setBuildMode('harvest');
+        });
+        
         document.getElementById('btn-demolish').addEventListener('click', () => {
             this.gameWorld.setBuildMode('demolish');
         });
