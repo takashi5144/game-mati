@@ -13,7 +13,7 @@ class ResourceManager {
         this.wateringCanFilled = false; // じょうろに水が入っているか
         
         this.population = 0;
-        this.maxPopulation = 10; // 初期の人口上限を10に設定
+        this.maxPopulation = 2; // 初期の人口上限を2に設定
         
         this.setupEventListeners();
         this.updateUI();

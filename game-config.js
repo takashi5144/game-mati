@@ -62,6 +62,16 @@ const GAME_CONFIG = {
             productionInterval: 15,
             requiredWorker: 'lumberjack',
             color: 0x654321
+        },
+        BARN: {
+            id: 'barn',
+            name: '納屋',
+            icon: '🏚️',
+            cost: { wood: 15, money: 50 },
+            buildTime: 5,
+            size: { width: 3, height: 3 },
+            storage: true,
+            color: 0x8B4513
         }
     },
 

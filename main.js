@@ -206,6 +206,10 @@ class PixelFarmGame {
             this.gameWorld.setBuildMode('lumbermill');
         });
         
+        document.getElementById('btn-barn').addEventListener('click', () => {
+            this.gameWorld.setBuildMode('barn');
+        });
+        
         document.getElementById('btn-demolish').addEventListener('click', () => {
             this.gameWorld.setBuildMode('demolish');
         });
@@ -371,15 +375,32 @@ class PixelFarmGame {
     }
 
     spawnInitialResidents() {
-        // 初期の住民を生成（全員無職）
+        // 初期の住民を生成（2人）
         setTimeout(() => {
-            // 6人の無職住民を生成
-            for (let i = 0; i < 6; i++) {
-                this.resourceManager.spawnResident('none');
+            // 2人の住民を生成
+            const resident1 = this.resourceManager.spawnResident('none');
+            if (resident1) {
+                resident1.name = '①';
+                // ResidentAIでも名前を更新
+                const residentData = this.residentAI.getResident(resident1.id);
+                if (residentData) {
+                    residentData.name = '①';
+                }
+            }
+            
+            const resident2 = this.resourceManager.spawnResident('none');
+            if (resident2) {
+                resident2.name = '②';
+                // ResidentAIでも名前を更新
+                const residentData = this.residentAI.getResident(resident2.id);
+                if (residentData) {
+                    residentData.name = '②';
+                }
             }
             
             logGameEvent('初期住民生成完了', { 
-                total: 6,
+                total: 2,
+                names: ['①', '②'],
                 profession: '無職' 
             });
             
@@ -391,17 +412,16 @@ class PixelFarmGame {
     placeInitialBuildings() {
         // 初期建物を配置（住民がすぐに働けるように）
         setTimeout(() => {
-            // 畑を3つ配置
-            this.gameWorld.placeBuilding(8, 8, 'farm');
-            this.gameWorld.placeBuilding(11, 8, 'farm');
-            this.gameWorld.placeBuilding(14, 8, 'farm');
+            // 納屋を中央に配置
+            this.gameWorld.placeBuilding(15, 15, 'barn');
             
-            // 家を2つ配置
-            this.gameWorld.placeBuilding(8, 11, 'house');
-            this.gameWorld.placeBuilding(11, 11, 'house');
+            // 畑を3つ配置（納屋の周りに）
+            this.gameWorld.placeBuilding(10, 10, 'farm');
+            this.gameWorld.placeBuilding(13, 10, 'farm');
+            this.gameWorld.placeBuilding(16, 10, 'farm');
             
-            // 製材所を1つ配置
-            this.gameWorld.placeBuilding(14, 11, 'lumbermill');
+            // 家を1つ配置
+            this.gameWorld.placeBuilding(10, 13, 'house');
             
             // 建物をすぐに完成状態にする
             this.gameWorld.buildings.forEach(building => {
@@ -411,9 +431,9 @@ class PixelFarmGame {
             });
             
             logGameEvent('初期建物配置完了', { 
+                barn: 1,
                 farms: 3, 
-                houses: 2, 
-                lumbermills: 1 
+                houses: 1
             });
         }, 500);
     }
@@ -613,6 +633,9 @@ class PixelFarmGame {
                 break;
             case '3':
                 this.gameWorld.setBuildMode('lumbermill');
+                break;
+            case '4':
+                this.gameWorld.setBuildMode('barn');
                 break;
             case 'd':
             case 'D':

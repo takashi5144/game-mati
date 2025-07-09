@@ -33,7 +33,10 @@ class ResidentAI {
             workProgress: 0,
             energy: 100,
             seedWarningShown: false,
-            waterWarningShown: false
+            waterWarningShown: false,
+            currentTool: null, // 現在持っている農具
+            hasSeeds: false, // 種を持っているか
+            hasWater: false // 水を持っているか
         };
         
         this.residents.set(id, resident);
@@ -101,12 +104,19 @@ class ResidentAI {
             resident.pathIndex++;
             if (resident.pathIndex >= resident.path.length) {
                 // 目的地に到着
-                resident.state = 'working';
                 resident.pathIndex = 0;
                 resident.path = [];
                 
-                if (resident.workplace) {
-                    resident.workplace.worker = resident;
+                // onArrivalコールバックがあれば実行
+                if (resident.onArrival) {
+                    resident.onArrival();
+                    resident.onArrival = null;
+                } else {
+                    // 通常の作業開始
+                    resident.state = 'working';
+                    if (resident.workplace) {
+                        resident.workplace.worker = resident;
+                    }
                 }
             }
         } else {
@@ -255,6 +265,17 @@ class ResidentAI {
         
         return nearest;
     }
+    
+    // 納屋を見つける
+    findBarn() {
+        let barn = null;
+        this.gameWorld.buildings.forEach(building => {
+            if (building.type === 'barn' && building.isComplete) {
+                barn = building;
+            }
+        });
+        return barn;
+    }
 
     assignWork(resident, workplace) {
         resident.workplace = workplace;
@@ -385,7 +406,12 @@ class ResidentAI {
         const farmStateUpper = farm.farmState ? farm.farmState.toUpperCase() : 'BARREN';
         switch(farmStateUpper) {
             case 'BARREN':
-                // 荒地を耕す
+                // 荒地を耕す（鍬が必要）
+                if (!resident.currentTool || resident.currentTool !== 'hoe') {
+                    // 納屋に鍬を取りに行く
+                    this.goToBarnForTool(resident, 'hoe');
+                    return;
+                }
                 if (farm.stateTimer >= 2) {
                     this.gameWorld.changeFarmState(farm, 'TILLED');
                     this.createWorkEffect(farm, 'till');
@@ -393,10 +419,16 @@ class ResidentAI {
                 break;
                 
             case 'TILLED':
-                // 種をまく（ジャガイモの種を使用）
+                // 種をまく（種が必要）
+                if (!resident.hasSeeds) {
+                    // 納屋に種を取りに行く
+                    this.goToBarnForTool(resident, 'seeds');
+                    return;
+                }
                 if (farm.stateTimer >= stateConfig.duration) {
                     if (window.resourceManager && window.resourceManager.hasSeeds('potato')) {
                         window.resourceManager.useSeeds('potato');
+                        resident.hasSeeds = false; // 種を使った
                         this.gameWorld.changeFarmState(farm, 'SEEDED');
                         this.createWorkEffect(farm, 'seed');
                         logGameEvent('種まき完了', {
@@ -420,19 +452,19 @@ class ResidentAI {
                 
             case 'SEEDED':
                 // 水やり（じょうろに水が必要）
-                if (farm.stateTimer >= stateConfig.duration) {
-                    if (window.resourceManager && window.resourceManager.wateringCanFilled) {
-                        window.resourceManager.useWateringCan();
-                        this.gameWorld.changeFarmState(farm, 'WATERED');
-                        this.createWorkEffect(farm, 'water');
+                if (!resident.currentTool || resident.currentTool !== 'wateringCan' || !resident.hasWater) {
+                    // 納屋にじょうろを取りに行くか、水を汲みに行く
+                    if (!resident.currentTool || resident.currentTool !== 'wateringCan') {
+                        this.goToBarnForTool(resident, 'wateringCan');
                     } else {
-                        // 水がない場合は待機（作業場所は保持）
-                        farm.stateTimer = 0; // タイマーをリセット
-                        if (window.game && !resident.waterWarningShown) {
-                            window.game.showNotification('川で水を汲んでください！', 'error');
-                            resident.waterWarningShown = true;
-                        }
+                        this.goToRiverForWater(resident);
                     }
+                    return;
+                }
+                if (farm.stateTimer >= stateConfig.duration) {
+                    resident.hasWater = false; // 水を使った
+                    this.gameWorld.changeFarmState(farm, 'WATERED');
+                    this.createWorkEffect(farm, 'water');
                 }
                 break;
                 
@@ -604,5 +636,111 @@ class ResidentAI {
         };
         
         return droplet;
+    }
+    
+    // 納屋に道具を取りに行く
+    goToBarnForTool(resident, toolType) {
+        const barn = this.findBarn();
+        if (!barn) {
+            if (window.game) {
+                window.game.showNotification('納屋が必要です！', 'error');
+            }
+            return;
+        }
+        
+        // 現在の作業場所を保存
+        const savedWorkplace = resident.workplace;
+        
+        // 納屋に移動
+        resident.target = { x: barn.x, z: barn.z };
+        resident.path = this.findPath(resident.position, resident.target);
+        resident.pathIndex = 0;
+        resident.state = 'moving';
+        
+        // 納屋に到着したら道具を取得
+        resident.onArrival = () => {
+            switch(toolType) {
+                case 'hoe':
+                    resident.currentTool = 'hoe';
+                    if (window.game) {
+                        window.game.showNotification(`${resident.name}が鍬を取得しました`, 'success');
+                    }
+                    break;
+                case 'wateringCan':
+                    resident.currentTool = 'wateringCan';
+                    if (window.game) {
+                        window.game.showNotification(`${resident.name}がじょうろを取得しました`, 'success');
+                    }
+                    break;
+                case 'seeds':
+                    if (window.resourceManager && window.resourceManager.hasSeeds('potato')) {
+                        resident.hasSeeds = true;
+                        if (window.game) {
+                            window.game.showNotification(`${resident.name}が種を取得しました`, 'success');
+                        }
+                    }
+                    break;
+            }
+            
+            // 元の作業場所に戻る
+            resident.workplace = savedWorkplace;
+            if (savedWorkplace) {
+                resident.target = { x: savedWorkplace.x, z: savedWorkplace.z };
+                resident.path = this.findPath(resident.position, resident.target);
+                resident.pathIndex = 0;
+                resident.state = 'moving';
+            }
+        };
+    }
+    
+    // 川に水を汲みに行く
+    goToRiverForWater(resident) {
+        // 川のタイルを探す
+        let riverTile = null;
+        let minDistance = Infinity;
+        
+        this.gameWorld.tiles.forEach(tile => {
+            if (tile.type === 'water') {
+                const dx = tile.x - resident.position.x;
+                const dz = tile.z - resident.position.z;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    riverTile = tile;
+                }
+            }
+        });
+        
+        if (!riverTile) {
+            return;
+        }
+        
+        // 現在の作業場所を保存
+        const savedWorkplace = resident.workplace;
+        
+        // 川に移動
+        resident.target = { x: riverTile.x, z: riverTile.z };
+        resident.path = this.findPath(resident.position, resident.target);
+        resident.pathIndex = 0;
+        resident.state = 'moving';
+        
+        // 川に到着したら水を汲む
+        resident.onArrival = () => {
+            resident.hasWater = true;
+            this.gameWorld.createWaterFillEffect(riverTile.x, riverTile.z);
+            if (window.game) {
+                window.game.showNotification(`${resident.name}が水を汲みました`, 'success');
+            }
+            
+            // 元の作業場所に戻る
+            resident.workplace = savedWorkplace;
+            if (savedWorkplace) {
+                resident.target = { x: savedWorkplace.x, z: savedWorkplace.z };
+                resident.path = this.findPath(resident.position, resident.target);
+                resident.pathIndex = 0;
+                resident.state = 'moving';
+            }
+        };
     }
 }

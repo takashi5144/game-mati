@@ -613,6 +613,95 @@ class RealisticBuilder {
                 log.receiveShadow = true;
                 group.add(log);
             }
+        } else if (buildingType === 'barn') {
+            // 納屋の土台
+            const baseGeometry = new THREE.BoxGeometry(config.size.width, 0.3, config.size.height);
+            const baseMaterial = this.createRealisticMaterial({
+                color: 0x696969,
+                textureUrl: 'stone',
+                roughness: 0.9
+            });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = 0.15;
+            base.castShadow = true;
+            base.receiveShadow = true;
+            group.add(base);
+
+            // 納屋の壁（赤い木材）
+            const wallMaterial = this.createRealisticMaterial({
+                color: 0xB22222,
+                textureUrl: 'wood',
+                roughness: 0.8
+            });
+            
+            // 前後の壁
+            const wallFrontGeometry = new THREE.BoxGeometry(config.size.width, 2.5, 0.1);
+            const wallFront = new THREE.Mesh(wallFrontGeometry, wallMaterial);
+            wallFront.position.set(0, 1.4, config.size.height/2);
+            wallFront.castShadow = true;
+            wallFront.receiveShadow = true;
+            group.add(wallFront);
+            
+            const wallBack = wallFront.clone();
+            wallBack.position.z = -config.size.height/2;
+            group.add(wallBack);
+            
+            // 左右の壁
+            const wallSideGeometry = new THREE.BoxGeometry(0.1, 2.5, config.size.height);
+            const wallLeft = new THREE.Mesh(wallSideGeometry, wallMaterial);
+            wallLeft.position.set(-config.size.width/2, 1.4, 0);
+            wallLeft.castShadow = true;
+            wallLeft.receiveShadow = true;
+            group.add(wallLeft);
+            
+            const wallRight = wallLeft.clone();
+            wallRight.position.x = config.size.width/2;
+            group.add(wallRight);
+
+            // 三角屋根
+            const roofShape = new THREE.Shape();
+            roofShape.moveTo(0, 0);
+            roofShape.lineTo(config.size.width * 0.6, 0);
+            roofShape.lineTo(config.size.width * 0.3, 1.2);
+            roofShape.closePath();
+            
+            const roofGeometry = new THREE.ExtrudeGeometry(roofShape, {
+                depth: config.size.height * 1.1,
+                bevelEnabled: false
+            });
+            roofGeometry.rotateX(-Math.PI / 2);
+            roofGeometry.translate(-config.size.width * 0.3, 2.65, -config.size.height * 0.55);
+            
+            const roofMaterial = this.createRealisticMaterial({
+                color: 0x4B4B4B,
+                roughness: 0.85
+            });
+            const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+            roof.castShadow = true;
+            roof.receiveShadow = true;
+            group.add(roof);
+
+            // 大きなドア
+            const doorGeometry = new THREE.BoxGeometry(config.size.width * 0.6, 2, 0.15);
+            const doorMaterial = this.createRealisticMaterial({
+                color: 0x8B4513,
+                textureUrl: 'wood',
+                roughness: 0.7
+            });
+            const door = new THREE.Mesh(doorGeometry, doorMaterial);
+            door.position.set(0, 1.15, config.size.height/2);
+            door.castShadow = true;
+            group.add(door);
+
+            // 農具置き場の印
+            const signGeometry = new THREE.BoxGeometry(0.8, 0.6, 0.05);
+            const signMaterial = this.createRealisticMaterial({
+                color: 0xF5DEB3,
+                roughness: 0.6
+            });
+            const sign = new THREE.Mesh(signGeometry, signMaterial);
+            sign.position.set(0, 2.2, config.size.height/2 + 0.05);
+            group.add(sign);
         }
 
         group.userData = { buildingType: buildingType, config: config };
