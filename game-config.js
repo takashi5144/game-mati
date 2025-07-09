@@ -15,6 +15,18 @@ const GAME_CONFIG = {
         FRUSTUM_SIZE: 35
     },
 
+    // 畑の状態
+    FARM_STATES: {
+        BARREN: { id: 'barren', name: '荒地', duration: 0 },
+        TILLED: { id: 'tilled', name: '耕された畑', duration: 2 },
+        SEEDED: { id: 'seeded', name: '種がまかれた畑', duration: 2 },
+        WATERED: { id: 'watered', name: '水やり済みの畑', duration: 3 },
+        SPROUTED: { id: 'sprouted', name: '芽が出た畑', duration: 5 },
+        GROWING_EARLY: { id: 'growing_early', name: '成長初期の畑', duration: 5 },
+        GROWING_MID: { id: 'growing_mid', name: '成長中期の畑', duration: 5 },
+        READY: { id: 'ready', name: '収穫可能な畑', duration: 0 }
+    },
+
     // 建物の定義
     BUILDINGS: {
         FARM: {

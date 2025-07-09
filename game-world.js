@@ -152,7 +152,9 @@ class GameWorld {
             progress: 0,
             config: config,
             worker: null,
-            productionTimer: 0
+            productionTimer: 0,
+            farmState: buildingType === 'farm' ? 'BARREN' : null,
+            stateTimer: 0
         };
         
         // タイルを占有状態にする
@@ -202,7 +204,8 @@ class GameWorld {
         // 畑の場合は初期成長段階を0に設定
         if (building.type === 'farm') {
             building.growthStage = 0;
-            building.mesh = this.voxelBuilder.createBuilding(building.type, 0);
+            building.farmState = 'BARREN';
+            building.mesh = this.voxelBuilder.createBuilding(building.type, 0, building.farmState);
         } else {
             building.mesh = this.voxelBuilder.createBuilding(building.type);
         }
@@ -321,9 +324,28 @@ class GameWorld {
         this.scene.remove(building.mesh);
         
         // 成長段階に応じた新しいメッシュを作成
-        building.mesh = this.voxelBuilder.createBuilding(building.type, building.growthStage);
+        building.mesh = this.voxelBuilder.createBuilding(building.type, building.growthStage, building.farmState);
         building.mesh.position.set(building.x, 0, building.z);
         this.scene.add(building.mesh);
+    }
+    
+    // 畑の状態を変更
+    changeFarmState(building, newState) {
+        if (building.type !== 'farm' || !building.isComplete) return;
+        
+        const oldState = building.farmState;
+        building.farmState = newState;
+        building.stateTimer = 0;
+        
+        // メッシュを更新
+        this.updateFarmGrowth(building);
+        
+        logGameEvent('畑の状態変更', {
+            buildingId: building.id,
+            oldState: oldState,
+            newState: newState,
+            position: { x: building.x, z: building.z }
+        });
     }
 
     getAvailableBuildings(type) {

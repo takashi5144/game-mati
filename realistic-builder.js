@@ -256,52 +256,211 @@ class RealisticBuilder {
 
         return group;
     }
+    
+    // 畑の状態に応じた見た目を作成
+    createFarmWithState(config, state) {
+        const group = new THREE.Group();
+        
+        // ベースの土
+        const baseGeometry = new THREE.BoxGeometry(config.size.width, 0.1, config.size.height);
+        let baseMaterial;
+        
+        switch(state) {
+            case 'BARREN':
+                // 荒地：乾いた土
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x8B7355,
+                    textureUrl: 'soil',
+                    roughness: 0.95
+                });
+                break;
+                
+            case 'TILLED':
+                // 耕された畑：暗い湿った土
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x654321,
+                    textureUrl: 'soil',
+                    roughness: 0.85
+                });
+                // 畝を作る
+                for (let i = -1; i <= 1; i++) {
+                    const ridgeGeometry = new THREE.BoxGeometry(config.size.width * 0.9, 0.15, 0.3);
+                    const ridge = new THREE.Mesh(ridgeGeometry, baseMaterial);
+                    ridge.position.set(0, 0.075, i * 0.6);
+                    ridge.receiveShadow = true;
+                    ridge.castShadow = true;
+                    group.add(ridge);
+                }
+                break;
+                
+            case 'SEEDED':
+                // 種がまかれた畑
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x654321,
+                    textureUrl: 'soil',
+                    roughness: 0.85
+                });
+                // 畝と種
+                for (let i = -1; i <= 1; i++) {
+                    const ridgeGeometry = new THREE.BoxGeometry(config.size.width * 0.9, 0.15, 0.3);
+                    const ridge = new THREE.Mesh(ridgeGeometry, baseMaterial);
+                    ridge.position.set(0, 0.075, i * 0.6);
+                    ridge.receiveShadow = true;
+                    group.add(ridge);
+                    
+                    // 種（小さな点）
+                    for (let x = -3; x <= 3; x++) {
+                        const seedGeometry = new THREE.SphereGeometry(0.02, 4, 4);
+                        const seedMaterial = this.createRealisticMaterial({
+                            color: 0xF4A460,
+                            roughness: 0.8
+                        });
+                        const seed = new THREE.Mesh(seedGeometry, seedMaterial);
+                        seed.position.set(x * 0.25, 0.16, i * 0.6);
+                        group.add(seed);
+                    }
+                }
+                break;
+                
+            case 'WATERED':
+                // 水やり済み：湿った黒い土
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x3C2414,
+                    textureUrl: 'soil',
+                    roughness: 0.7,
+                    metalness: 0.1
+                });
+                // 畝と種（湿った状態）
+                for (let i = -1; i <= 1; i++) {
+                    const ridgeGeometry = new THREE.BoxGeometry(config.size.width * 0.9, 0.15, 0.3);
+                    const ridge = new THREE.Mesh(ridgeGeometry, baseMaterial);
+                    ridge.position.set(0, 0.075, i * 0.6);
+                    ridge.receiveShadow = true;
+                    group.add(ridge);
+                }
+                break;
+                
+            case 'SPROUTED':
+                // 芽が出た
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x3C2414,
+                    textureUrl: 'soil',
+                    roughness: 0.75
+                });
+                this.addCropsToFarm(group, config, 0.1, 0x90EE90); // 小さな緑の芽
+                break;
+                
+            case 'GROWING_EARLY':
+                // 成長初期
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x654321,
+                    textureUrl: 'soil',
+                    roughness: 0.8
+                });
+                this.addCropsToFarm(group, config, 0.3, 0x7CFC00); // 少し大きな緑
+                break;
+                
+            case 'GROWING_MID':
+                // 成長中期
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x654321,
+                    textureUrl: 'soil',
+                    roughness: 0.8
+                });
+                this.addCropsToFarm(group, config, 0.6, 0x7CFC00); // 中サイズの緑
+                break;
+                
+            case 'READY':
+                // 収穫可能
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x654321,
+                    textureUrl: 'soil',
+                    roughness: 0.8
+                });
+                this.addCropsToFarm(group, config, 1.0, 0xFFD700); // 金色の成熟した作物
+                break;
+                
+            default:
+                baseMaterial = this.createRealisticMaterial({
+                    color: 0x8B4513,
+                    textureUrl: 'soil',
+                    roughness: 0.9
+                });
+        }
+        
+        const base = new THREE.Mesh(baseGeometry, baseMaterial);
+        base.position.y = 0.05;
+        base.receiveShadow = true;
+        group.add(base);
+        
+        return group;
+    }
+    
+    // 作物を畑に追加
+    addCropsToFarm(group, config, growthLevel, color) {
+        const baseMaterial = this.createRealisticMaterial({
+            color: 0x654321,
+            textureUrl: 'soil',
+            roughness: 0.8
+        });
+        
+        // 畝
+        for (let i = -1; i <= 1; i++) {
+            const ridgeGeometry = new THREE.BoxGeometry(config.size.width * 0.9, 0.15, 0.3);
+            const ridge = new THREE.Mesh(ridgeGeometry, baseMaterial);
+            ridge.position.set(0, 0.075, i * 0.6);
+            ridge.receiveShadow = true;
+            group.add(ridge);
+            
+            // 作物
+            for (let x = -3; x <= 3; x++) {
+                if (growthLevel < 0.5) {
+                    // 小さな芽や葉
+                    const leafGeometry = new THREE.ConeGeometry(0.03 + growthLevel * 0.1, 0.05 + growthLevel * 0.3, 4);
+                    const leafMaterial = this.createRealisticMaterial({
+                        color: color,
+                        roughness: 0.6
+                    });
+                    const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+                    leaf.position.set(x * 0.25, 0.15 + (growthLevel * 0.3)/2, i * 0.6);
+                    leaf.castShadow = true;
+                    group.add(leaf);
+                } else {
+                    // 大きな作物
+                    const stemGeometry = new THREE.CylinderGeometry(0.02, 0.02, growthLevel * 0.4, 6);
+                    const stemMaterial = this.createRealisticMaterial({
+                        color: 0x228B22,
+                        roughness: 0.7
+                    });
+                    const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+                    stem.position.set(x * 0.25, 0.15 + (growthLevel * 0.4)/2, i * 0.6);
+                    stem.castShadow = true;
+                    group.add(stem);
+                    
+                    // 実や花
+                    const fruitGeometry = new THREE.SphereGeometry(0.05 + growthLevel * 0.05, 6, 6);
+                    const fruitMaterial = this.createRealisticMaterial({
+                        color: color,
+                        roughness: 0.5,
+                        emissive: color,
+                        emissiveIntensity: 0.1
+                    });
+                    const fruit = new THREE.Mesh(fruitGeometry, fruitMaterial);
+                    fruit.position.set(x * 0.25, 0.15 + growthLevel * 0.4, i * 0.6);
+                    fruit.castShadow = true;
+                    group.add(fruit);
+                }
+            }
+        }
+    }
 
     // リアルな建物を作成
-    createBuilding(buildingType, growthStage = 1.0) {
+    createBuilding(buildingType, growthStage = 1.0, farmState = null) {
         const group = new THREE.Group();
         const config = GAME_CONFIG.BUILDINGS[buildingType.toUpperCase()];
         
         if (buildingType === 'farm') {
-            // 畑のベース
-            const baseGeometry = new THREE.BoxGeometry(config.size.width, 0.1, config.size.height);
-            const baseMaterial = this.createRealisticMaterial({
-                color: 0x8B4513,
-                textureUrl: 'soil',
-                roughness: 0.9
-            });
-            const base = new THREE.Mesh(baseGeometry, baseMaterial);
-            base.position.y = 0.05;
-            base.receiveShadow = true;
-            group.add(base);
-
-            // 畝（うね）
-            for (let i = -1; i <= 1; i++) {
-                const ridgeGeometry = new THREE.BoxGeometry(config.size.width * 0.9, 0.15, 0.3);
-                const ridge = new THREE.Mesh(ridgeGeometry, baseMaterial);
-                ridge.position.set(0, 0.075, i * 0.6);
-                ridge.receiveShadow = true;
-                group.add(ridge);
-            }
-
-            // 作物
-            if (growthStage > 0) {
-                const cropMaterial = this.createRealisticMaterial({
-                    color: growthStage < 0.5 ? 0x90EE90 : (growthStage < 0.8 ? 0x7CFC00 : 0xFFD700),
-                    roughness: 0.6
-                });
-                
-                for (let x = -3; x <= 3; x++) {
-                    for (let z = -1; z <= 1; z++) {
-                        const cropHeight = 0.1 + (growthStage * 0.5);
-                        const cropGeometry = new THREE.CylinderGeometry(0.05, 0.05, cropHeight, 6);
-                        const crop = new THREE.Mesh(cropGeometry, cropMaterial);
-                        crop.position.set(x * 0.25, 0.15 + cropHeight/2, z * 0.6);
-                        crop.castShadow = true;
-                        group.add(crop);
-                    }
-                }
-            }
+            group.add(this.createFarmWithState(config, farmState || 'BARREN'));
         } else if (buildingType === 'house') {
             // 土台
             const foundationGeometry = new THREE.BoxGeometry(config.size.width, 0.3, config.size.height);

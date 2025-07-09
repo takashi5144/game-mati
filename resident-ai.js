@@ -141,6 +141,11 @@ class ResidentAI {
         if (resident.profession === 'farmer') {
             // 農作業（上下運動）
             resident.mesh.position.y = Math.abs(Math.sin(resident.workProgress * 3)) * 0.2;
+            
+            // 畑の状態に応じた作業
+            if (resident.workplace.type === 'farm') {
+                this.updateFarmWork(resident, resident.workplace, deltaTime);
+            }
         } else if (resident.profession === 'builder') {
             // 建築作業（ハンマーを振る動き）
             const armRight = resident.mesh.children.find(child => 
@@ -324,5 +329,178 @@ class ResidentAI {
 
     getResident(residentId) {
         return this.residents.get(residentId);
+    }
+    
+    // 畑の状態に応じた作業
+    updateFarmWork(resident, farm, deltaTime) {
+        const stateConfig = GAME_CONFIG.FARM_STATES[farm.farmState];
+        if (!stateConfig) return;
+        
+        farm.stateTimer += deltaTime;
+        
+        // 現在の状態に応じた処理
+        switch(farm.farmState) {
+            case 'BARREN':
+                // 荒地を耕す
+                if (farm.stateTimer >= 2) {
+                    this.gameWorld.changeFarmState(farm, 'TILLED');
+                    this.createWorkEffect(farm, 'till');
+                }
+                break;
+                
+            case 'TILLED':
+                // 種をまく
+                if (farm.stateTimer >= stateConfig.duration) {
+                    this.gameWorld.changeFarmState(farm, 'SEEDED');
+                    this.createWorkEffect(farm, 'seed');
+                }
+                break;
+                
+            case 'SEEDED':
+                // 水やり
+                if (farm.stateTimer >= stateConfig.duration) {
+                    this.gameWorld.changeFarmState(farm, 'WATERED');
+                    this.createWorkEffect(farm, 'water');
+                }
+                break;
+                
+            case 'WATERED':
+                // 芽が出るのを待つ
+                if (farm.stateTimer >= stateConfig.duration) {
+                    this.gameWorld.changeFarmState(farm, 'SPROUTED');
+                }
+                break;
+                
+            case 'SPROUTED':
+                // 成長を見守る
+                if (farm.stateTimer >= stateConfig.duration) {
+                    this.gameWorld.changeFarmState(farm, 'GROWING_EARLY');
+                }
+                break;
+                
+            case 'GROWING_EARLY':
+                // 成長中期へ
+                if (farm.stateTimer >= stateConfig.duration) {
+                    this.gameWorld.changeFarmState(farm, 'GROWING_MID');
+                }
+                break;
+                
+            case 'GROWING_MID':
+                // 収穫可能へ
+                if (farm.stateTimer >= stateConfig.duration) {
+                    this.gameWorld.changeFarmState(farm, 'READY');
+                }
+                break;
+                
+            case 'READY':
+                // 収穫する
+                if (farm.stateTimer >= 1) {
+                    // 収穫処理
+                    const event = new CustomEvent('resourceProduced', {
+                        detail: {
+                            resources: { food: farm.config.production.food },
+                            building: farm
+                        }
+                    });
+                    window.dispatchEvent(event);
+                    
+                    // 畑を荒地に戻す
+                    this.gameWorld.changeFarmState(farm, 'BARREN');
+                    this.createWorkEffect(farm, 'harvest');
+                    
+                    logGameEvent('収穫完了', {
+                        farmId: farm.id,
+                        production: farm.config.production.food,
+                        position: { x: farm.x, z: farm.z }
+                    });
+                }
+                break;
+        }
+    }
+    
+    // 作業エフェクトを作成
+    createWorkEffect(building, type) {
+        let particles = [];
+        
+        switch(type) {
+            case 'till':
+                // 土ぼこりエフェクト
+                for (let i = 0; i < 5; i++) {
+                    const particle = this.voxelBuilder.createParticleEffect('build', {
+                        x: building.x + Math.random() * 2 - 1,
+                        y: 0.5,
+                        z: building.z + Math.random() * 2 - 1
+                    });
+                    particles = particles.concat(particle);
+                }
+                break;
+                
+            case 'seed':
+                // 種まきエフェクト（小さな黄色い粒子）
+                for (let i = 0; i < 3; i++) {
+                    const particle = this.voxelBuilder.createParticleEffect('harvest', {
+                        x: building.x + Math.random() * 2 - 1,
+                        y: 0.3,
+                        z: building.z + Math.random() * 2 - 1
+                    });
+                    particles = particles.concat(particle);
+                }
+                break;
+                
+            case 'water':
+                // 水やりエフェクト（青い粒子）
+                for (let i = 0; i < 8; i++) {
+                    const waterDrop = this.createWaterDroplet(
+                        building.x + Math.random() * 2 - 1,
+                        1.5,
+                        building.z + Math.random() * 2 - 1
+                    );
+                    particles.push(waterDrop);
+                }
+                break;
+                
+            case 'harvest':
+                // 収穫エフェクト
+                particles = this.voxelBuilder.createParticleEffect('harvest', {
+                    x: building.x,
+                    y: 1,
+                    z: building.z
+                });
+                break;
+        }
+        
+        // パーティクルをシーンに追加
+        particles.forEach(p => this.scene.add(p));
+        
+        // 一定時間後に削除
+        setTimeout(() => {
+            particles.forEach(p => this.scene.remove(p));
+        }, 1500);
+    }
+    
+    // 水滴を作成
+    createWaterDroplet(x, y, z) {
+        const geometry = new THREE.SphereGeometry(0.05, 6, 6);
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x4169E1,
+            transparent: true,
+            opacity: 0.7,
+            emissive: 0x4169E1,
+            emissiveIntensity: 0.2
+        });
+        const droplet = new THREE.Mesh(geometry, material);
+        droplet.position.set(x, y, z);
+        
+        // 落下アニメーション用のユーザーデータ
+        droplet.userData = {
+            velocity: {
+                x: (Math.random() - 0.5) * 0.1,
+                y: -0.3,
+                z: (Math.random() - 0.5) * 0.1
+            },
+            lifetime: 1.5
+        };
+        
+        return droplet;
     }
 }

@@ -142,11 +142,35 @@ class VoxelBuilder {
     }
 
     // 建物を作成
-    createBuilding(buildingType, growthStage = 1.0) {
+    createBuilding(buildingType, growthStage = 1.0, farmState = null) {
         const group = new THREE.Group();
         const config = GAME_CONFIG.BUILDINGS[buildingType.toUpperCase()];
         
-        if (buildingType === 'farm') {
+        if (buildingType === 'farm' && farmState) {
+            // 状態に応じた畑の見た目（簡易版）
+            const baseColor = farmState === 'WATERED' ? 0x3C2414 : 
+                            farmState === 'TILLED' ? 0x654321 : 0x8B4513;
+            const base = this.createVoxel(baseColor, { x: 0, y: 0.05, z: 0 });
+            base.scale.set(config.size.width, 0.1, config.size.height);
+            group.add(base);
+            
+            // 成長段階に応じた作物
+            if (['SPROUTED', 'GROWING_EARLY', 'GROWING_MID', 'READY'].includes(farmState)) {
+                const growthLevel = farmState === 'SPROUTED' ? 0.2 :
+                                  farmState === 'GROWING_EARLY' ? 0.5 :
+                                  farmState === 'GROWING_MID' ? 0.8 : 1.0;
+                const cropColor = farmState === 'READY' ? 0xFFD700 : 0x7CFC00;
+                
+                for (let x = -0.5; x <= 0.5; x += 0.5) {
+                    for (let z = -0.5; z <= 0.5; z += 0.5) {
+                        const cropHeight = 0.1 + (growthLevel * 0.5);
+                        const crop = this.createVoxel(cropColor, { x: x, y: 0.1 + cropHeight/2, z: z }, 0.2);
+                        crop.scale.y = cropHeight;
+                        group.add(crop);
+                    }
+                }
+            }
+        } else if (buildingType === 'farm') {
             // 畑のベース（土のテクスチャ付き）
             const soilTexture = {
                 size: 8,
