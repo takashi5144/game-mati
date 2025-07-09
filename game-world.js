@@ -372,6 +372,22 @@ class GameWorld {
         if (mode) {
             const btn = document.getElementById(`btn-${mode}`);
             if (btn) btn.classList.add('selected');
+            
+            // カーソルを更新
+            if (window.game) {
+                if (['harvest', 'resource', 'farmzone', 'cleararea'].includes(mode)) {
+                    window.game.setCursor('selecting');
+                } else if (mode === 'demolish') {
+                    window.game.setCursor('demolish');
+                } else {
+                    window.game.setCursor('building');
+                }
+            }
+        } else {
+            // モードがnullの場合はデフォルトカーソル
+            if (window.game) {
+                window.game.setCursor('default');
+            }
         }
     }
 
@@ -590,6 +606,123 @@ class GameWorld {
         
         logGameEvent('伐採完了', {
             position: { x: tile.x, z: tile.z }
+        });
+    }
+    
+    // 資源確保エリアをマーク
+    markResourceArea(tile) {
+        if (!tile || !['forest', 'stone'].includes(tile.type)) return;
+        
+        // 資源マーカーを表示
+        const markerGeometry = new THREE.RingGeometry(0.3, 0.4, 4);
+        const markerMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x00FF00,
+            side: THREE.DoubleSide
+        });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.rotation.x = -Math.PI / 2;
+        marker.position.set(tile.x, 0.1, tile.z);
+        marker.name = `resource_marker_${tile.x}_${tile.z}`;
+        this.scene.add(marker);
+        
+        // タイルに資源マークを追加
+        tile.resourceMarked = true;
+        
+        logGameEvent('資源エリア指定', {
+            position: { x: tile.x, z: tile.z },
+            type: tile.type
+        });
+    }
+    
+    // 農地を作成
+    createFarmZone(x, z) {
+        const tile = this.getTileAt(x, z);
+        if (!tile || tile.occupied || !['grass', 'dirt'].includes(tile.type)) {
+            return false;
+        }
+        
+        // タイルを農地に変更
+        tile.type = 'dirt';
+        tile.farmReady = true;
+        
+        // 古いメッシュを削除
+        this.scene.remove(tile.mesh);
+        
+        // 農地タイルを作成
+        const builder = window.game.useRealisticMode ? window.game.realisticBuilder : window.game.voxelBuilder;
+        tile.mesh = builder.createGroundTile('dirt', tile.x, tile.z);
+        this.scene.add(tile.mesh);
+        
+        // 農地マーカーを追加
+        const markerGeometry = new THREE.PlaneGeometry(0.9, 0.9);
+        const markerMaterial = new THREE.MeshBasicMaterial({
+            color: 0x8B4513,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.rotation.x = -Math.PI / 2;
+        marker.position.set(tile.x, 0.05, tile.z);
+        marker.name = `farm_marker_${tile.x}_${tile.z}`;
+        this.scene.add(marker);
+        
+        logGameEvent('農地作成', {
+            position: { x: tile.x, z: tile.z }
+        });
+        
+        return true;
+    }
+    
+    // 整地対象をマーク
+    markForClearing(tile) {
+        if (!tile || !['forest', 'stone'].includes(tile.type)) return;
+        
+        // 整地マーカーを表示（×印）
+        const markerGroup = new THREE.Group();
+        
+        // ×印の線を作成
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xFF0000, linewidth: 3 });
+        
+        const line1Geometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-0.3, 0.1, -0.3),
+            new THREE.Vector3(0.3, 0.1, 0.3)
+        ]);
+        const line1 = new THREE.Line(line1Geometry, lineMaterial);
+        
+        const line2Geometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-0.3, 0.1, 0.3),
+            new THREE.Vector3(0.3, 0.1, -0.3)
+        ]);
+        const line2 = new THREE.Line(line2Geometry, lineMaterial);
+        
+        markerGroup.add(line1);
+        markerGroup.add(line2);
+        markerGroup.position.set(tile.x, 0, tile.z);
+        markerGroup.name = `clear_marker_${tile.x}_${tile.z}`;
+        this.scene.add(markerGroup);
+        
+        // タイルに整地マークを追加
+        tile.clearingMarked = true;
+        
+        // 整地タスクを作成
+        const clearingTask = {
+            id: `clear_${Date.now()}`,
+            type: 'clear_area',
+            position: { x: tile.x, z: tile.z },
+            tile: tile,
+            assigned: false
+        };
+        
+        // グローバル変数として公開（建築家が見つけられるように）
+        if (!window.clearingTasks) {
+            window.clearingTasks = [];
+        }
+        window.clearingTasks.push(clearingTask);
+        
+        logGameEvent('整地エリア指定', {
+            position: { x: tile.x, z: tile.z },
+            type: tile.type
         });
     }
 }

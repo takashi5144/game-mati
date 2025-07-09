@@ -7,6 +7,12 @@ class PixelFarmGame {
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
         
+        // ドラッグ選択用の変数
+        this.isDragging = false;
+        this.dragStart = new THREE.Vector2();
+        this.dragEnd = new THREE.Vector2();
+        this.selectionBox = null;
+        
         // カメラコントロール用の変数
         this.cameraControls = {
             isRotating: false,
@@ -210,12 +216,25 @@ class PixelFarmGame {
             this.gameWorld.setBuildMode('barn');
         });
         
-        document.getElementById('btn-harvest-tree').addEventListener('click', () => {
-            this.gameWorld.setBuildMode('harvest');
+        // 範囲指定ツール
+        document.getElementById('btn-resource').addEventListener('click', () => {
+            this.gameWorld.setBuildMode('resource');
+        });
+        
+        document.getElementById('btn-farmzone').addEventListener('click', () => {
+            this.gameWorld.setBuildMode('farmzone');
+        });
+        
+        document.getElementById('btn-cleararea').addEventListener('click', () => {
+            this.gameWorld.setBuildMode('cleararea');
         });
         
         document.getElementById('btn-demolish').addEventListener('click', () => {
             this.gameWorld.setBuildMode('demolish');
+        });
+        
+        document.getElementById('btn-cancel').addEventListener('click', () => {
+            this.gameWorld.setBuildMode(null);
         });
         
         document.getElementById('btn-expand-map').addEventListener('click', () => {
@@ -382,24 +401,20 @@ class PixelFarmGame {
         // 初期の住民を生成（2人）
         setTimeout(() => {
             // 2人の住民を生成
-            const resident1 = this.resourceManager.spawnResident('none');
+            const spawnPos1 = { x: 15, z: 13 };
+            const resident1 = this.residentAI.createResident('none', spawnPos1);
             if (resident1) {
                 resident1.name = '①';
-                // ResidentAIでも名前を更新
-                const residentData = this.residentAI.getResident(resident1.id);
-                if (residentData) {
-                    residentData.name = '①';
-                }
+                this.resourceManager.population++;
+                this.resourceManager.updateUI();
             }
             
-            const resident2 = this.resourceManager.spawnResident('none');
+            const spawnPos2 = { x: 17, z: 13 };
+            const resident2 = this.residentAI.createResident('none', spawnPos2);
             if (resident2) {
                 resident2.name = '②';
-                // ResidentAIでも名前を更新
-                const residentData = this.residentAI.getResident(resident2.id);
-                if (residentData) {
-                    residentData.name = '②';
-                }
+                this.resourceManager.population++;
+                this.resourceManager.updateUI();
             }
             
             logGameEvent('初期住民生成完了', { 
@@ -443,8 +458,15 @@ class PixelFarmGame {
     }
 
     onMouseClick(event) {
-        // カメラ操作中はクリックイベントを無視
-        if (this.cameraControls.isRotating || this.cameraControls.isPanning) {
+        // 右クリックでツールをキャンセル
+        if (event.button === 2) {
+            event.preventDefault();
+            this.gameWorld.setBuildMode(null);
+            return;
+        }
+        
+        // カメラ操作中やドラッグ選択中はクリックイベントを無視
+        if (this.cameraControls.isRotating || this.cameraControls.isPanning || this.isDragging) {
             return;
         }
         
@@ -563,23 +585,50 @@ class PixelFarmGame {
             this.cameraControls.panStart.copy(this.cameraControls.panEnd);
             this.updateCamera();
         }
+        
+        // ドラッグ選択中（すべての範囲選択モードで有効）
+        if (this.isDragging && (this.gameWorld.buildMode === 'harvest' || 
+            this.gameWorld.buildMode === 'resource' || 
+            this.gameWorld.buildMode === 'farmzone' || 
+            this.gameWorld.buildMode === 'cleararea')) {
+            const rect = this.renderer.domElement.getBoundingClientRect();
+            this.dragEnd.set(event.clientX - rect.left, event.clientY - rect.top);
+            this.updateSelectionBox();
+        }
     }
     
     onMouseDown(event) {
         event.preventDefault();
         
         if (event.button === 0) { // 左クリック
-            this.cameraControls.isRotating = true;
-            this.cameraControls.rotateStart.set(event.clientX, event.clientY);
+            if (this.gameWorld.buildMode === 'harvest' || this.gameWorld.buildMode === 'resource' || 
+                this.gameWorld.buildMode === 'farmzone' || this.gameWorld.buildMode === 'cleararea') {
+                // 範囲選択モードの場合はドラッグ選択開始
+                this.isDragging = true;
+                const rect = this.renderer.domElement.getBoundingClientRect();
+                this.dragStart.set(event.clientX - rect.left, event.clientY - rect.top);
+                this.dragEnd.copy(this.dragStart);
+                this.createSelectionBox();
+            }
         } else if (event.button === 1) { // 中クリック
             this.cameraControls.isPanning = true;
             this.cameraControls.panStart.set(event.clientX, event.clientY);
+        } else if (event.button === 2) { // 右クリック
+            this.cameraControls.isRotating = true;
+            this.cameraControls.rotateStart.set(event.clientX, event.clientY);
         }
     }
     
     onMouseUp(event) {
         this.cameraControls.isRotating = false;
         this.cameraControls.isPanning = false;
+        
+        if (this.isDragging && (this.gameWorld.buildMode === 'harvest' || this.gameWorld.buildMode === 'resource' || 
+            this.gameWorld.buildMode === 'farmzone' || this.gameWorld.buildMode === 'cleararea')) {
+            this.isDragging = false;
+            this.completeSelection();
+            this.removeSelectionBox();
+        }
     }
     
     onMouseWheel(event) {
@@ -625,27 +674,56 @@ class PixelFarmGame {
     }
 
     onKeyDown(event) {
-        switch(event.key) {
+        switch(event.key.toLowerCase()) {
+            // ゲーム速度制御
             case ' ':
                 this.togglePause();
                 break;
             case '1':
-                this.gameWorld.setBuildMode('farm');
+                this.setGameSpeed(1);
                 break;
             case '2':
-                this.gameWorld.setBuildMode('house');
+                this.setGameSpeed(2);
                 break;
             case '3':
-                this.gameWorld.setBuildMode('lumbermill');
+                this.setGameSpeed(5);
                 break;
-            case '4':
-                this.gameWorld.setBuildMode('barn');
+            
+            // カメラ移動（WASD）
+            case 'w':
+                this.moveCameraRelative(0, -1);
+                break;
+            case 's':
+                this.moveCameraRelative(0, 1);
+                break;
+            case 'a':
+                this.moveCameraRelative(-1, 0);
                 break;
             case 'd':
-            case 'D':
-                this.gameWorld.setBuildMode('demolish');
+                this.moveCameraRelative(1, 0);
                 break;
-            case 'Escape':
+            
+            // カメラ回転（QE）
+            case 'q':
+                this.rotateCameraBy(-Math.PI / 8);
+                break;
+            case 'e':
+                this.rotateCameraBy(Math.PI / 8);
+                break;
+            
+            // UIパネル
+            case 'b':
+                this.toggleBuildPanel();
+                break;
+            case 'r':
+                this.toggleResourcePanel();
+                break;
+            case 'p':
+                this.toggleResidentPanel();
+                break;
+            
+            // その他
+            case 'escape':
                 this.gameWorld.setBuildMode(null);
                 this.gameWorld.deselectTile();
                 this.selectedResident = null;
@@ -660,6 +738,68 @@ class PixelFarmGame {
         btn.textContent = this.isPaused ? '▶️ 再開' : '⏸️ 一時停止';
         
         logGameEvent('ゲーム一時停止', { paused: this.isPaused });
+    }
+    
+    // ゲーム速度を設定
+    setGameSpeed(speed) {
+        this.gameSpeed = speed;
+        const btn = document.getElementById('btn-speed');
+        const labels = ['1x', '2x', '5x'];
+        const speeds = [1, 2, 5];
+        const index = speeds.indexOf(speed);
+        if (index !== -1) {
+            btn.textContent = `⏩ 速度: ${labels[index]}`;
+        }
+        logGameEvent('ゲーム速度変更', { speed: speed });
+    }
+    
+    // カメラを相対的に移動
+    moveCameraRelative(dx, dz) {
+        const moveSpeed = 2;
+        const forward = new THREE.Vector3();
+        const right = new THREE.Vector3();
+        
+        // カメラの向きに基づいて移動方向を計算
+        this.camera.getWorldDirection(forward);
+        forward.y = 0;
+        forward.normalize();
+        
+        right.crossVectors(forward, new THREE.Vector3(0, 1, 0));
+        
+        this.cameraControls.target.add(right.multiplyScalar(dx * moveSpeed));
+        this.cameraControls.target.add(forward.multiplyScalar(dz * moveSpeed));
+        
+        this.updateCamera();
+    }
+    
+    // カメラを回転
+    rotateCameraBy(angle) {
+        this.cameraControls.spherical.theta += angle;
+        this.updateCamera();
+    }
+    
+    // 建設パネルの表示/非表示
+    toggleBuildPanel() {
+        const panel = document.getElementById('ui-bottom');
+        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    }
+    
+    // リソースパネルの表示/非表示（将来実装用）
+    toggleResourcePanel() {
+        // TODO: リソース専用パネルを実装
+        this.showNotification('リソースパネル（R）は準備中です');
+    }
+    
+    // 住民パネルの表示/非表示
+    toggleResidentPanel() {
+        const window = document.getElementById('resident-window');
+        if (window.classList.contains('hidden')) {
+            window.classList.remove('hidden');
+            this.updateMarketTab();
+            this.updateStatsTab();
+        } else {
+            window.classList.add('hidden');
+        }
     }
 
     cycleGameSpeed() {
@@ -801,6 +941,200 @@ class PixelFarmGame {
         
         // レンダリング
         this.renderer.render(this.scene, this.camera);
+    }
+    
+    // カーソルを設定
+    setCursor(type) {
+        const container = document.getElementById('game-container');
+        container.classList.remove('selecting-cursor', 'building-cursor', 'demolish-cursor');
+        
+        switch(type) {
+            case 'selecting':
+                container.classList.add('selecting-cursor');
+                break;
+            case 'building':
+                container.classList.add('building-cursor');
+                break;
+            case 'demolish':
+                container.classList.add('demolish-cursor');
+                break;
+            default:
+                // デフォルトカーソル
+                break;
+        }
+    }
+    
+    // 選択ボックスを作成
+    createSelectionBox() {
+        if (!this.selectionBox) {
+            this.selectionBox = document.createElement('div');
+            this.selectionBox.style.cssText = `
+                position: absolute;
+                border: 2px solid #00FF00;
+                background: rgba(0, 255, 0, 0.1);
+                pointer-events: none;
+                z-index: 1000;
+            `;
+            document.getElementById('game-container').appendChild(this.selectionBox);
+        }
+    }
+    
+    // 選択ボックスを更新
+    updateSelectionBox() {
+        if (!this.selectionBox) return;
+        
+        const left = Math.min(this.dragStart.x, this.dragEnd.x);
+        const top = Math.min(this.dragStart.y, this.dragEnd.y);
+        const width = Math.abs(this.dragEnd.x - this.dragStart.x);
+        const height = Math.abs(this.dragEnd.y - this.dragStart.y);
+        
+        this.selectionBox.style.left = left + 'px';
+        this.selectionBox.style.top = top + 'px';
+        this.selectionBox.style.width = width + 'px';
+        this.selectionBox.style.height = height + 'px';
+    }
+    
+    // 選択ボックスを削除
+    removeSelectionBox() {
+        if (this.selectionBox) {
+            this.selectionBox.remove();
+            this.selectionBox = null;
+        }
+    }
+    
+    // 選択完了処理
+    completeSelection() {
+        if (!this.gameWorld.buildMode) return;
+        
+        // 選択範囲の四隅を3D空間に変換
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        const corners = [
+            { x: this.dragStart.x, y: this.dragStart.y },
+            { x: this.dragEnd.x, y: this.dragStart.y },
+            { x: this.dragEnd.x, y: this.dragEnd.y },
+            { x: this.dragStart.x, y: this.dragEnd.y }
+        ];
+        
+        const worldCorners = corners.map(corner => {
+            const mouse = new THREE.Vector2(
+                (corner.x / rect.width) * 2 - 1,
+                -(corner.y / rect.height) * 2 + 1
+            );
+            
+            this.raycaster.setFromCamera(mouse, this.camera);
+            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+            
+            if (intersects.length > 0) {
+                return intersects[0].point;
+            }
+            return null;
+        }).filter(p => p !== null);
+        
+        if (worldCorners.length < 2) return;
+        
+        // 選択範囲を計算
+        const minX = Math.floor(Math.min(...worldCorners.map(p => p.x)));
+        const maxX = Math.floor(Math.max(...worldCorners.map(p => p.x)));
+        const minZ = Math.floor(Math.min(...worldCorners.map(p => p.z)));
+        const maxZ = Math.floor(Math.max(...worldCorners.map(p => p.z)));
+        
+        let selectedCount = 0;
+        
+        switch(this.gameWorld.buildMode) {
+            case 'harvest':
+                // 伐採指定（従来の処理）
+                this.gameWorld.tiles.forEach(tile => {
+                    if (tile.type === 'forest' && 
+                        tile.x >= minX && tile.x <= maxX &&
+                        tile.z >= minZ && tile.z <= maxZ) {
+                        this.gameWorld.harvestTree(tile);
+                        selectedCount++;
+                    }
+                });
+                
+                if (selectedCount > 0) {
+                    this.showNotification(`${selectedCount}本の木を伐採対象に指定しました`, 'success');
+                }
+                break;
+                
+            case 'resource':
+                // 資源確保エリアの指定
+                this.gameWorld.tiles.forEach(tile => {
+                    if ((tile.type === 'forest' || tile.type === 'stone') && 
+                        tile.x >= minX && tile.x <= maxX &&
+                        tile.z >= minZ && tile.z <= maxZ) {
+                        this.gameWorld.markResourceArea(tile);
+                        selectedCount++;
+                    }
+                });
+                
+                if (selectedCount > 0) {
+                    this.showNotification(`${selectedCount}マスを資源確保エリアに指定しました`, 'success');
+                }
+                break;
+                
+            case 'farmzone':
+                // 農地エリアの作成
+                // まず作成可能なマス数を数える
+                let farmableCount = 0;
+                for (let x = minX; x <= maxX; x++) {
+                    for (let z = minZ; z <= maxZ; z++) {
+                        const tile = this.gameWorld.getTileAt(x, z);
+                        if (tile && (tile.type === 'grass' || tile.type === 'dirt') && !tile.occupied) {
+                            farmableCount++;
+                        }
+                    }
+                }
+                
+                if (farmableCount === 0) {
+                    this.showNotification('農地を作成できる場所がありません', 'error');
+                    break;
+                }
+                
+                // 資源チェック
+                const cost = farmableCount * 10; // 1マスあたり木材10
+                if (!this.resourceManager.canAfford({ wood: cost })) {
+                    this.showNotification(`木材が不足しています（必要: ${cost}）`, 'error');
+                    break;
+                }
+                
+                // 農地を作成
+                for (let x = minX; x <= maxX; x++) {
+                    for (let z = minZ; z <= maxZ; z++) {
+                        const tile = this.gameWorld.getTileAt(x, z);
+                        if (tile && (tile.type === 'grass' || tile.type === 'dirt')) {
+                            if (this.gameWorld.createFarmZone(x, z)) {
+                                selectedCount++;
+                            }
+                        }
+                    }
+                }
+                
+                if (selectedCount > 0) {
+                    this.showNotification(`${selectedCount}マスの農地を作成しました`, 'success');
+                    // 資源を消費
+                    this.resourceManager.consumeResources({ wood: selectedCount * 10 });
+                }
+                break;
+                
+            case 'cleararea':
+                // 整地エリアの指定
+                this.gameWorld.tiles.forEach(tile => {
+                    if ((tile.type === 'forest' || tile.type === 'stone') && 
+                        tile.x >= minX && tile.x <= maxX &&
+                        tile.z >= minZ && tile.z <= maxZ) {
+                        this.gameWorld.markForClearing(tile);
+                        selectedCount++;
+                    }
+                });
+                
+                if (selectedCount > 0) {
+                    this.showNotification(`${selectedCount}マスを整地対象に指定しました`, 'success');
+                }
+                break;
+        }
+        
+        this.gameWorld.setBuildMode(null);
     }
 }
 

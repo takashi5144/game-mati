@@ -517,3 +517,61 @@ body {
         font-size: 24px;
     }
 }
+
+/* Banished風UI改善 */
+.tool-categories {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.tool-category {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.tool-category h4 {
+    color: #8f8;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tool-category .action-buttons {
+    margin-bottom: 0;
+}
+
+.control-hints {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #888;
+}
+
+.control-hints span {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+/* 範囲選択時のカーソル */
+.selecting-cursor {
+    cursor: crosshair !important;
+}
+
+/* 建設モード時のカーソル */
+.building-cursor {
+    cursor: pointer !important;
+}
+
+/* 撤去モード時のカーソル */
+.demolish-cursor {
+    cursor: not-allowed !important;
+}

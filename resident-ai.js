@@ -36,7 +36,10 @@ class ResidentAI {
             waterWarningShown: false,
             currentTool: null, // 現在持っている農具
             hasSeeds: false, // 種を持っているか
-            hasWater: false // 水を持っているか
+            hasWater: false, // 水を持っているか
+            carryingWood: 0, // 運んでいる木材の数
+            harvestTask: null, // 現在の伐採タスク
+            onArrival: null // 到着時のコールバック
         };
         
         this.residents.set(id, resident);

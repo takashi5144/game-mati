@@ -65,14 +65,6 @@ class ResourceManager {
             // コストを消費
             this.consumeResources(config.cost);
             this.showNotification(`${config.name}の建設を開始しました`, 'success');
-            
-            // 建築家を生成して割り当て（人口に余裕がある場合）
-            if (this.population < this.maxPopulation) {
-                const spawnPos = this.findSpawnPosition();
-                const builder = window.residentAI.createResident('builder', spawnPos);
-                this.population++;
-                this.updateUI();
-            }
         }
     }
 
