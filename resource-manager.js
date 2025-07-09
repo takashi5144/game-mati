@@ -97,8 +97,9 @@ class ResourceManager {
 
     findSpawnPosition() {
         // マップの中心付近のランダムな位置
-        const centerX = GAME_CONFIG.MAP.WIDTH / 2;
-        const centerZ = GAME_CONFIG.MAP.HEIGHT / 2;
+        const mapSize = window.gameWorld ? window.gameWorld.mapSize : GAME_CONFIG.MAP.WIDTH;
+        const centerX = mapSize / 2;
+        const centerZ = mapSize / 2;
         
         return {
             x: centerX + (Math.random() - 0.5) * 4,
@@ -133,6 +134,15 @@ class ResourceManager {
                 btn.title = `${config.name} (${costText})`;
             }
         });
+        
+        // マップ拡張ボタンの状態を更新
+        const expandBtn = document.getElementById('btn-expand-map');
+        if (expandBtn) {
+            const expandCost = { money: 500, wood: 50 };
+            const canExpand = this.canAfford(expandCost);
+            expandBtn.style.opacity = canExpand ? '1' : '0.5';
+            expandBtn.style.cursor = canExpand ? 'pointer' : 'not-allowed';
+        }
     }
 
     showNotification(message, type = 'info') {

@@ -49,7 +49,7 @@ class GameWorld {
             }
         }
         
-        logGameEvent('マップ生成完了', { width: WIDTH, height: HEIGHT });
+        logGameEvent('マップ生成完了', { width: size, height: size });
     }
 
     createSelectionCursor() {
