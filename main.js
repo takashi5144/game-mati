@@ -21,7 +21,7 @@ class PixelFarmGame {
             sphericalDelta: new THREE.Spherical(),
             scale: 1,
             zoomSpeed: 0.1,
-            target: new THREE.Vector3(10, 0, 10),
+            target: new THREE.Vector3(15, 0, 15),
             minDistance: 5,
             maxDistance: 100,
             minPolarAngle: 0,
@@ -30,7 +30,7 @@ class PixelFarmGame {
         
         this.voxelBuilder = new VoxelBuilder();
         this.realisticBuilder = new RealisticBuilder();
-        this.useRealisticMode = false; // 一時的にVoxelBuilderでテスト
+        this.useRealisticMode = true; // リアルモードを有効化
         this.gameWorld = null;
         this.residentAI = null;
         this.resourceManager = null;
@@ -652,33 +652,25 @@ class PixelFarmGame {
     }
     
     expandMap() {
-        const expandCost = { money: 500, wood: 50 };
+        const expandCost = { money: 0, wood: 0 };  // 無料で拡張可能に
         
-        // リソースの確認
-        if (this.resourceManager.canAfford(expandCost)) {
-            // リソースを消費
-            this.resourceManager.consumeResources(expandCost);
-            
-            // マップを拡張
-            const currentSize = this.gameWorld.mapSize || 20;
-            const newSize = currentSize + 2;
-            
-            // 新しいタイルを追加
-            this.gameWorld.expandMap(newSize);
-            
-            // カメラターゲットを新しい中心に調整
-            this.cameraControls.target.set(newSize / 2, 0, newSize / 2);
-            this.updateCamera();
-            
-            this.showNotification(`マップを${newSize}x${newSize}に拡張しました！`);
-            logGameEvent('マップ拡張', { 
-                oldSize: currentSize, 
-                newSize: newSize,
-                cost: expandCost 
-            });
-        } else {
-            this.showNotification('リソースが不足しています', 'error');
-        }
+        // マップを拡張
+        const currentSize = this.gameWorld.mapSize || 20;
+        const newSize = currentSize + 5;  // 一度に5マス拡張
+        
+        // 新しいタイルを追加
+        this.gameWorld.expandMap(newSize);
+        
+        // カメラターゲットを新しい中心に調整
+        this.cameraControls.target.set(newSize / 2, 0, newSize / 2);
+        this.updateCamera();
+        
+        this.showNotification(`マップを${newSize}x${newSize}に拡張しました！`);
+        logGameEvent('マップ拡張', { 
+            oldSize: currentSize, 
+            newSize: newSize,
+            cost: expandCost 
+        });
     }
 
     updateSeasons(deltaTime) {

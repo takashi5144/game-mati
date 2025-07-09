@@ -2,17 +2,17 @@
 const GAME_CONFIG = {
     // マップ設定
     MAP: {
-        WIDTH: 20,
-        HEIGHT: 20,
+        WIDTH: 30,
+        HEIGHT: 30,
         TILE_SIZE: 1,
         TILE_HEIGHT: 0.1
     },
 
     // カメラ設定
     CAMERA: {
-        POSITION: { x: 15, y: 20, z: 15 },
-        LOOK_AT: { x: 10, y: 0, z: 10 },
-        FRUSTUM_SIZE: 25
+        POSITION: { x: 20, y: 25, z: 20 },
+        LOOK_AT: { x: 15, y: 0, z: 15 },
+        FRUSTUM_SIZE: 35
     },
 
     // 建物の定義

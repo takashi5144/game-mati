@@ -135,13 +135,11 @@ class ResourceManager {
             }
         });
         
-        // マップ拡張ボタンの状態を更新
+        // マップ拡張ボタンの状態を更新（常に有効）
         const expandBtn = document.getElementById('btn-expand-map');
         if (expandBtn) {
-            const expandCost = { money: 500, wood: 50 };
-            const canExpand = this.canAfford(expandCost);
-            expandBtn.style.opacity = canExpand ? '1' : '0.5';
-            expandBtn.style.cursor = canExpand ? 'pointer' : 'not-allowed';
+            expandBtn.style.opacity = '1';
+            expandBtn.style.cursor = 'pointer';
         }
     }
 
