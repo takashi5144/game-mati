@@ -80,7 +80,7 @@ class ResourceManager {
         }
         return true;
     }
-
+    
     consumeResources(cost) {
         for (const [resource, amount] of Object.entries(cost)) {
             this.resources[resource] -= amount;

@@ -52,6 +52,10 @@
                 <span class="btn-icon">🔨</span>
                 <span class="btn-label">撤去</span>
             </button>
+            <button class="action-btn" id="btn-expand-map" title="マップを拡張 (資金: 500, 木材: 50)">
+                <span class="btn-icon">🗺️</span>
+                <span class="btn-label">マップ拡張</span>
+            </button>
         </div>
         <div class="game-controls">
             <button id="btn-pause">⏸️ 一時停止</button>
@@ -85,12 +89,18 @@
                     <p>状態: <span id="resident-state">-</span></p>
                     <p>エネルギー: <span id="resident-energy">-</span></p>
                 </div>
-                <div class="profession-buttons">
+                <div class="profession-control">
                     <h4>職業を変更:</h4>
-                    <button class="profession-btn" data-profession="none">🧑 無職</button>
-                    <button class="profession-btn" data-profession="farmer">👨‍🌾 農夫</button>
-                    <button class="profession-btn" data-profession="builder">👷 建築家</button>
-                    <button class="profession-btn" data-profession="lumberjack">🪓 木こり</button>
+                    <div class="profession-select-wrapper">
+                        <select id="profession-select" class="profession-dropdown">
+                            <option value="">職業を選択してください</option>
+                            <option value="none">🧑 無職</option>
+                            <option value="farmer">👨‍🌾 農夫</option>
+                            <option value="builder">👷 建築家</option>
+                            <option value="lumberjack">🪓 木こり</option>
+                        </select>
+                        <button id="btn-change-profession" class="btn-primary">決定</button>
+                    </div>
                 </div>
             </div>
             
@@ -124,6 +134,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="game-config.js"></script>
     <script src="voxel-builder.js"></script>
+    <script src="realistic-builder.js"></script>
     <script src="game-world.js"></script>
     <script src="resident-ai.js"></script>
     <script src="resource-manager.js"></script>

@@ -7,7 +7,29 @@ class PixelFarmGame {
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
         
+        // カメラコントロール用の変数
+        this.cameraControls = {
+            isRotating: false,
+            isPanning: false,
+            rotateStart: new THREE.Vector2(),
+            rotateEnd: new THREE.Vector2(),
+            rotateDelta: new THREE.Vector2(),
+            panStart: new THREE.Vector2(),
+            panEnd: new THREE.Vector2(),
+            panDelta: new THREE.Vector2(),
+            spherical: new THREE.Spherical(),
+            sphericalDelta: new THREE.Spherical(),
+            scale: 1,
+            zoomSpeed: 0.1,
+            target: new THREE.Vector3(10, 0, 10),
+            minDistance: 5,
+            maxDistance: 100,
+            minPolarAngle: 0,
+            maxPolarAngle: Math.PI * 0.495
+        };
+        
         this.voxelBuilder = new VoxelBuilder();
+        this.realisticBuilder = new RealisticBuilder();
         this.gameWorld = null;
         this.residentAI = null;
         this.resourceManager = null;
@@ -30,14 +52,10 @@ class PixelFarmGame {
         this.scene = new THREE.Scene();
         this.scene.fog = new THREE.Fog(0x87CEEB, 20, 50);
         
-        // カメラの設定（正投影カメラ）
-        const aspect = window.innerWidth / window.innerHeight;
-        const frustumSize = GAME_CONFIG.CAMERA.FRUSTUM_SIZE;
-        this.camera = new THREE.OrthographicCamera(
-            frustumSize * aspect / -2,
-            frustumSize * aspect / 2,
-            frustumSize / 2,
-            frustumSize / -2,
+        // カメラの設定（透視投影カメラ）
+        this.camera = new THREE.PerspectiveCamera(
+            45,
+            window.innerWidth / window.innerHeight,
             0.1,
             1000
         );
@@ -52,9 +70,13 @@ class PixelFarmGame {
             GAME_CONFIG.CAMERA.LOOK_AT.z
         );
         
+        // カメラコントロールの初期化
+        const offset = new THREE.Vector3().subVectors(this.camera.position, this.cameraControls.target);
+        this.cameraControls.spherical.setFromVector3(offset);
+        
         // レンダラーの設定
         this.renderer = new THREE.WebGLRenderer({ 
-            antialias: false,  // ピクセルアート風にするためアンチエイリアスを無効に
+            antialias: true,  // リアルな見た目のためアンチエイリアスを有効に
             alpha: true 
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -70,8 +92,8 @@ class PixelFarmGame {
         this.setupLighting();
         
         // ゲームオブジェクトの初期化
-        this.gameWorld = new GameWorld(this.scene, this.voxelBuilder);
-        this.residentAI = new ResidentAI(this.scene, this.voxelBuilder, this.gameWorld);
+        this.gameWorld = new GameWorld(this.scene, this.realisticBuilder);
+        this.residentAI = new ResidentAI(this.scene, this.realisticBuilder, this.gameWorld);
         this.resourceManager = new ResourceManager();
         
         // グローバル変数として公開（他のクラスから参照できるように）
@@ -124,16 +146,38 @@ class PixelFarmGame {
         directionalLight.shadow.camera.bottom = -30;
         directionalLight.shadow.camera.near = 0.1;
         directionalLight.shadow.camera.far = 50;
-        directionalLight.shadow.mapSize.width = 2048;
-        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.mapSize.width = 4096;
+        directionalLight.shadow.mapSize.height = 4096;
         
         this.scene.add(directionalLight);
+        
+        // スポットライト（特定エリアの照明）
+        const spotLight = new THREE.SpotLight(
+            GAME_CONFIG.LIGHTING.SPOT.color,
+            GAME_CONFIG.LIGHTING.SPOT.intensity,
+            GAME_CONFIG.LIGHTING.SPOT.distance,
+            GAME_CONFIG.LIGHTING.SPOT.angle,
+            GAME_CONFIG.LIGHTING.SPOT.penumbra,
+            GAME_CONFIG.LIGHTING.SPOT.decay
+        );
+        spotLight.position.set(10, 20, 10);
+        spotLight.target.position.set(10, 0, 10);
+        spotLight.castShadow = true;
+        spotLight.shadow.mapSize.width = 2048;
+        spotLight.shadow.mapSize.height = 2048;
+        
+        this.scene.add(spotLight);
+        this.scene.add(spotLight.target);
     }
 
     setupEventListeners() {
         // マウスイベント
         this.renderer.domElement.addEventListener('click', (event) => this.onMouseClick(event));
         this.renderer.domElement.addEventListener('mousemove', (event) => this.onMouseMove(event));
+        this.renderer.domElement.addEventListener('mousedown', (event) => this.onMouseDown(event));
+        this.renderer.domElement.addEventListener('mouseup', (event) => this.onMouseUp(event));
+        this.renderer.domElement.addEventListener('wheel', (event) => this.onMouseWheel(event));
+        this.renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
         
         // ウィンドウリサイズ
         window.addEventListener('resize', () => this.onWindowResize());
@@ -155,6 +199,10 @@ class PixelFarmGame {
             this.gameWorld.setBuildMode('demolish');
         });
         
+        document.getElementById('btn-expand-map').addEventListener('click', () => {
+            this.expandMap();
+        });
+        
         document.getElementById('btn-pause').addEventListener('click', () => {
             this.togglePause();
         });
@@ -166,15 +214,16 @@ class PixelFarmGame {
         // キーボードショートカット
         document.addEventListener('keydown', (event) => this.onKeyDown(event));
         
-        // 職業変更ボタン
-        document.querySelectorAll('.profession-btn').forEach(btn => {
-            btn.addEventListener('click', (event) => {
-                if (this.selectedResident) {
-                    const newProfession = event.target.dataset.profession;
-                    this.residentAI.changeProfession(this.selectedResident.id, newProfession);
-                    this.updateResidentPanel();
-                }
-            });
+        // 職業変更セレクトボックス
+        document.getElementById('btn-change-profession').addEventListener('click', () => {
+            const select = document.getElementById('profession-select');
+            const newProfession = select.value;
+            
+            if (this.selectedResident && newProfession) {
+                this.residentAI.changeProfession(this.selectedResident.id, newProfession);
+                this.updateResidentPanel();
+                this.showNotification(`${this.selectedResident.name}の職業を${GAME_CONFIG.PROFESSIONS[newProfession].name}に変更しました`);
+            }
         });
         
         // ウィンドウシステム
@@ -359,6 +408,11 @@ class PixelFarmGame {
     }
 
     onMouseClick(event) {
+        // カメラ操作中はクリックイベントを無視
+        if (this.cameraControls.isRotating || this.cameraControls.isPanning) {
+            return;
+        }
+        
         // マウス座標を正規化
         const rect = this.renderer.domElement.getBoundingClientRect();
         this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -418,13 +472,9 @@ class PixelFarmGame {
         document.getElementById('resident-state').textContent = this.getResidentStateText(this.selectedResident.state);
         document.getElementById('resident-energy').textContent = `${Math.floor(this.selectedResident.energy)}/100`;
         
-        // 職業ボタンの状態を更新
-        document.querySelectorAll('.profession-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.profession === this.selectedResident.profession) {
-                btn.classList.add('active');
-            }
-        });
+        // 職業セレクトボックスの状態を更新
+        const select = document.getElementById('profession-select');
+        select.value = this.selectedResident.profession;
     }
     
     getResidentStateText(state) {
@@ -443,18 +493,98 @@ class PixelFarmGame {
         this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         
-        // ホバー効果のための処理をここに追加可能
+        // カメラ回転
+        if (this.cameraControls.isRotating) {
+            this.cameraControls.rotateEnd.set(event.clientX, event.clientY);
+            this.cameraControls.rotateDelta.subVectors(this.cameraControls.rotateEnd, this.cameraControls.rotateStart);
+            
+            const element = this.renderer.domElement;
+            this.cameraControls.sphericalDelta.theta -= 2 * Math.PI * this.cameraControls.rotateDelta.x / element.clientWidth;
+            this.cameraControls.sphericalDelta.phi -= 2 * Math.PI * this.cameraControls.rotateDelta.y / element.clientHeight;
+            
+            this.cameraControls.rotateStart.copy(this.cameraControls.rotateEnd);
+            this.updateCamera();
+        }
+        
+        // カメラパン
+        if (this.cameraControls.isPanning) {
+            this.cameraControls.panEnd.set(event.clientX, event.clientY);
+            this.cameraControls.panDelta.subVectors(this.cameraControls.panEnd, this.cameraControls.panStart);
+            
+            const offset = new THREE.Vector3();
+            const distance = this.camera.position.distanceTo(this.cameraControls.target);
+            const targetDistance = distance * Math.tan((this.camera.fov / 2) * Math.PI / 180);
+            
+            // 横方向の移動
+            offset.setFromMatrixColumn(this.camera.matrix, 0);
+            offset.multiplyScalar(-2 * this.cameraControls.panDelta.x * targetDistance / this.renderer.domElement.clientHeight);
+            this.cameraControls.target.add(offset);
+            
+            // 縦方向の移動
+            offset.setFromMatrixColumn(this.camera.matrix, 1);
+            offset.multiplyScalar(2 * this.cameraControls.panDelta.y * targetDistance / this.renderer.domElement.clientHeight);
+            this.cameraControls.target.add(offset);
+            
+            this.cameraControls.panStart.copy(this.cameraControls.panEnd);
+            this.updateCamera();
+        }
+    }
+    
+    onMouseDown(event) {
+        event.preventDefault();
+        
+        if (event.button === 0) { // 左クリック
+            this.cameraControls.isRotating = true;
+            this.cameraControls.rotateStart.set(event.clientX, event.clientY);
+        } else if (event.button === 1) { // 中クリック
+            this.cameraControls.isPanning = true;
+            this.cameraControls.panStart.set(event.clientX, event.clientY);
+        }
+    }
+    
+    onMouseUp(event) {
+        this.cameraControls.isRotating = false;
+        this.cameraControls.isPanning = false;
+    }
+    
+    onMouseWheel(event) {
+        event.preventDefault();
+        
+        if (event.deltaY < 0) {
+            this.cameraControls.scale /= 1.05;
+        } else {
+            this.cameraControls.scale *= 1.05;
+        }
+        
+        this.updateCamera();
+    }
+    
+    updateCamera() {
+        const offset = new THREE.Vector3();
+        
+        // カメラの球面座標を更新
+        this.cameraControls.spherical.radius *= this.cameraControls.scale;
+        this.cameraControls.spherical.theta += this.cameraControls.sphericalDelta.theta;
+        this.cameraControls.spherical.phi += this.cameraControls.sphericalDelta.phi;
+        
+        // 制限を適用
+        this.cameraControls.spherical.radius = Math.max(this.cameraControls.minDistance, Math.min(this.cameraControls.maxDistance, this.cameraControls.spherical.radius));
+        this.cameraControls.spherical.phi = Math.max(this.cameraControls.minPolarAngle, Math.min(this.cameraControls.maxPolarAngle, this.cameraControls.spherical.phi));
+        
+        // 球面座標から直交座標へ変換
+        offset.setFromSpherical(this.cameraControls.spherical);
+        
+        // カメラ位置を更新
+        this.camera.position.copy(this.cameraControls.target).add(offset);
+        this.camera.lookAt(this.cameraControls.target);
+        
+        // デルタをリセット
+        this.cameraControls.sphericalDelta.set(0, 0, 0);
+        this.cameraControls.scale = 1;
     }
 
     onWindowResize() {
-        const aspect = window.innerWidth / window.innerHeight;
-        const frustumSize = GAME_CONFIG.CAMERA.FRUSTUM_SIZE;
-        
-        this.camera.left = frustumSize * aspect / -2;
-        this.camera.right = frustumSize * aspect / 2;
-        this.camera.top = frustumSize / 2;
-        this.camera.bottom = frustumSize / -2;
-        
+        this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
@@ -508,6 +638,36 @@ class PixelFarmGame {
         btn.textContent = `⏩ 速度: ${labels[this.gameSpeed - 1]}`;
         
         logGameEvent('ゲーム速度変更', { speed: this.gameSpeed });
+    }
+    
+    expandMap() {
+        const expandCost = { money: 500, wood: 50 };
+        
+        // リソースの確認
+        if (this.resourceManager.canAfford(expandCost)) {
+            // リソースを消費
+            this.resourceManager.consumeResources(expandCost);
+            
+            // マップを拡張
+            const currentSize = this.gameWorld.mapSize || 20;
+            const newSize = currentSize + 2;
+            
+            // 新しいタイルを追加
+            this.gameWorld.expandMap(newSize);
+            
+            // カメラターゲットを新しい中心に調整
+            this.cameraControls.target.set(newSize / 2, 0, newSize / 2);
+            this.updateCamera();
+            
+            this.showNotification(`マップを${newSize}x${newSize}に拡張しました！`);
+            logGameEvent('マップ拡張', { 
+                oldSize: currentSize, 
+                newSize: newSize,
+                cost: expandCost 
+            });
+        } else {
+            this.showNotification('リソースが不足しています', 'error');
+        }
     }
 
     updateSeasons(deltaTime) {

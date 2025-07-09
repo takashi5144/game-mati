@@ -424,6 +424,74 @@ body {
     animation: pulse 2s ease-in-out infinite;
 }
 
+/* 職業変更コントロール */
+.profession-control {
+    margin-top: 20px;
+}
+
+.profession-control h4 {
+    color: #4CAF50;
+    margin-bottom: 15px;
+}
+
+.profession-select-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.profession-dropdown {
+    flex: 1;
+    background: rgba(40, 40, 40, 0.8);
+    border: 2px solid #444;
+    border-radius: 5px;
+    color: #fff;
+    padding: 10px 15px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.profession-dropdown:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+.profession-dropdown option {
+    background: #222;
+    color: #fff;
+}
+
+.btn-primary {
+    background: #4CAF50;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background: #5CBF60;
+    transform: translateY(-2px);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+/* マップ拡張ボタン */
+#btn-expand-map {
+    background: rgba(139, 69, 19, 0.8);
+    border-color: #A0522D;
+}
+
+#btn-expand-map:hover {
+    background: rgba(160, 82, 45, 0.9);
+    border-color: #CD853F;
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
     .resource-panel {

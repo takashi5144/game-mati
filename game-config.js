@@ -130,12 +130,20 @@ const GAME_CONFIG = {
     LIGHTING: {
         AMBIENT: {
             color: 0xffffff,
-            intensity: 0.6
+            intensity: 0.4
         },
         DIRECTIONAL: {
             color: 0xffffff,
-            intensity: 0.8,
-            position: { x: 5, y: 10, z: 5 }
+            intensity: 1.0,
+            position: { x: 10, y: 15, z: 10 }
+        },
+        SPOT: {
+            color: 0xffffff,
+            intensity: 0.5,
+            angle: Math.PI / 6,
+            penumbra: 0.1,
+            decay: 2,
+            distance: 30
         }
     },
 

@@ -8,16 +8,17 @@ class GameWorld {
         this.selectedTile = null;
         this.selectionCursor = null;
         this.buildMode = null;
+        this.mapSize = GAME_CONFIG.MAP.WIDTH;
         
         this.initializeMap();
         this.createSelectionCursor();
     }
 
     initializeMap() {
-        const { WIDTH, HEIGHT } = GAME_CONFIG.MAP;
+        const size = this.mapSize;
         
-        for (let x = 0; x < WIDTH; x++) {
-            for (let z = 0; z < HEIGHT; z++) {
+        for (let x = 0; x < size; x++) {
+            for (let z = 0; z < size; z++) {
                 let tileType = 'grass';
                 
                 // マップに変化を加える
@@ -375,5 +376,48 @@ class GameWorld {
         } else {
             this.selectTile(x, z);
         }
+    }
+    
+    expandMap(newSize) {
+        const oldSize = this.mapSize;
+        this.mapSize = newSize;
+        
+        // 新しいタイルを追加（既存のタイルの外側）
+        for (let x = 0; x < newSize; x++) {
+            for (let z = 0; z < newSize; z++) {
+                // 既存のタイルはスキップ
+                if (x < oldSize && z < oldSize) continue;
+                
+                const key = `${x},${z}`;
+                if (this.tiles.has(key)) continue;
+                
+                // 新しいタイルのタイプを決定
+                let tileType = 'grass';
+                if (Math.random() < 0.1) {
+                    tileType = 'forest';
+                } else if (Math.random() < 0.05) {
+                    tileType = 'dirt';
+                }
+                
+                // タイルを作成
+                const tile = this.voxelBuilder.createGroundTile(tileType, x, z);
+                this.scene.add(tile);
+                
+                this.tiles.set(key, {
+                    mesh: tile,
+                    x: x,
+                    z: z,
+                    type: tileType,
+                    building: null,
+                    occupied: false
+                });
+            }
+        }
+        
+        logGameEvent('マップ拡張完了', { 
+            oldSize: oldSize, 
+            newSize: newSize,
+            newTiles: (newSize * newSize) - (oldSize * oldSize)
+        });
     }
 }
