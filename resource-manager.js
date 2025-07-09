@@ -133,12 +133,6 @@ class ResourceManager {
             }
         });
         
-        // マップ拡張ボタンの状態を更新（常に有効）
-        const expandBtn = document.getElementById('btn-expand-map');
-        if (expandBtn) {
-            expandBtn.style.opacity = '1';
-            expandBtn.style.cursor = 'pointer';
-        }
     }
 
     showNotification(message, type = 'info') {

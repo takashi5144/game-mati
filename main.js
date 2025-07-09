@@ -237,10 +237,6 @@ class PixelFarmGame {
             this.gameWorld.setBuildMode(null);
         });
         
-        document.getElementById('btn-expand-map').addEventListener('click', () => {
-            this.expandMap();
-        });
-        
         document.getElementById('btn-pause').addEventListener('click', () => {
             this.togglePause();
         });
