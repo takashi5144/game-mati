@@ -31,7 +31,9 @@ class ResidentAI {
             path: [],
             pathIndex: 0,
             workProgress: 0,
-            energy: 100
+            energy: 100,
+            seedWarningShown: false,
+            waterWarningShown: false
         };
         
         this.residents.set(id, resident);
@@ -137,13 +139,23 @@ class ResidentAI {
         const workDuration = GAME_CONFIG.PROFESSIONS[resident.profession].workDuration;
         resident.workProgress += deltaTime;
         
+        // 警告フラグをリセット（リソースが補充された場合のため）
+        if (window.resourceManager) {
+            if (window.resourceManager.hasSeeds('potato')) {
+                resident.seedWarningShown = false;
+            }
+            if (window.resourceManager.wateringCanFilled) {
+                resident.waterWarningShown = false;
+            }
+        }
+        
         // 作業アニメーション
         if (resident.profession === 'farmer') {
             // 農作業（上下運動）
             resident.mesh.position.y = Math.abs(Math.sin(resident.workProgress * 3)) * 0.2;
             
             // 畑の状態に応じた作業
-            if (resident.workplace.type === 'farm') {
+            if (resident.workplace && resident.workplace.type === 'farm' && resident.workplace.isComplete) {
                 this.updateFarmWork(resident, resident.workplace, deltaTime);
             }
         } else if (resident.profession === 'builder') {
@@ -171,16 +183,36 @@ class ResidentAI {
                 resident.workplace = null;
                 resident.state = 'idle';
             }
+            
+            // 農夫は畑が収穫済みになったら次の仕事を探す
+            if (resident.profession === 'farmer' && resident.workplace.farmState === 'BARREN' && resident.workplace.stateTimer > 2) {
+                // 新しい畑を探す（他に作業可能な畑がある場合）
+                const farms = this.gameWorld.getAvailableBuildings('farm');
+                if (farms.length > 0) {
+                    resident.workplace.worker = null;
+                    resident.workplace = null;
+                    resident.state = 'idle';
+                }
+            }
         }
     }
 
     findWork(resident) {
         if (resident.profession === 'farmer') {
-            // 農夫は畑を探す
-            const farms = this.gameWorld.getAvailableBuildings('farm');
-            if (farms.length > 0) {
+            // 農夫は畑を探す（作業者がいない畑、または自分が作業中の畑）
+            const allFarms = [];
+            this.gameWorld.buildings.forEach(building => {
+                if (building.type === 'farm' && building.isComplete) {
+                    // 作業者がいない、または自分が作業中の畑
+                    if (!building.worker || building.worker.id === resident.id) {
+                        allFarms.push(building);
+                    }
+                }
+            });
+            
+            if (allFarms.length > 0) {
                 // 最も近い畑を選択
-                const nearestFarm = this.findNearestBuilding(resident, farms);
+                const nearestFarm = this.findNearestBuilding(resident, allFarms);
                 if (nearestFarm) {
                     this.assignWork(resident, nearestFarm);
                 }
@@ -333,13 +365,25 @@ class ResidentAI {
     
     // 畑の状態に応じた作業
     updateFarmWork(resident, farm, deltaTime) {
-        const stateConfig = GAME_CONFIG.FARM_STATES[farm.farmState];
-        if (!stateConfig) return;
+        // 大文字に変換してから取得
+        const stateKey = farm.farmState ? farm.farmState.toUpperCase() : 'BARREN';
+        const stateConfig = GAME_CONFIG.FARM_STATES[stateKey];
+        
+        if (!stateConfig) {
+            console.error(`No state config for farm state: ${farm.farmState} (key: ${stateKey})`);
+            return;
+        }
+        
+        // stateTimerが未定義の場合は初期化
+        if (farm.stateTimer === undefined) {
+            farm.stateTimer = 0;
+        }
         
         farm.stateTimer += deltaTime;
         
-        // 現在の状態に応じた処理
-        switch(farm.farmState) {
+        // 現在の状態に応じた処理（大文字小文字の問題を回避）
+        const farmStateUpper = farm.farmState ? farm.farmState.toUpperCase() : 'BARREN';
+        switch(farmStateUpper) {
             case 'BARREN':
                 // 荒地を耕す
                 if (farm.stateTimer >= 2) {
@@ -355,12 +399,20 @@ class ResidentAI {
                         window.resourceManager.useSeeds('potato');
                         this.gameWorld.changeFarmState(farm, 'SEEDED');
                         this.createWorkEffect(farm, 'seed');
-                    } else {
-                        // 種がない場合は待機
-                        resident.state = 'idle';
-                        resident.workplace = null;
+                        logGameEvent('種まき完了', {
+                            farmId: farm.id,
+                            position: { x: farm.x, z: farm.z },
+                            remainingSeeds: window.resourceManager.resources.seeds.potato
+                        });
                         if (window.game) {
+                            window.game.showNotification('種まき完了！', 'success');
+                        }
+                    } else {
+                        // 種がない場合は待機（作業場所は保持）
+                        farm.stateTimer = 0; // タイマーをリセットして再試行を促す
+                        if (window.game && !resident.seedWarningShown) {
                             window.game.showNotification('種が不足しています！', 'error');
+                            resident.seedWarningShown = true;
                         }
                     }
                 }
@@ -374,11 +426,11 @@ class ResidentAI {
                         this.gameWorld.changeFarmState(farm, 'WATERED');
                         this.createWorkEffect(farm, 'water');
                     } else {
-                        // 水がない場合は水を汲みに行く
-                        resident.state = 'idle';
-                        resident.workplace = null;
-                        if (window.game) {
+                        // 水がない場合は待機（作業場所は保持）
+                        farm.stateTimer = 0; // タイマーをリセット
+                        if (window.game && !resident.waterWarningShown) {
                             window.game.showNotification('川で水を汲んでください！', 'error');
+                            resident.waterWarningShown = true;
                         }
                     }
                 }
@@ -400,11 +452,10 @@ class ResidentAI {
                         this.gameWorld.changeFarmState(farm, 'GROWING_EARLY');
                     }
                 } else {
-                    // 水がない場合は成長が止まる
-                    resident.state = 'idle';
-                    resident.workplace = null;
-                    if (window.game) {
+                    // 水がない場合は成長が止まる（作業場所は保持）
+                    if (window.game && !resident.waterWarningShown) {
                         window.game.showNotification('成長中の作物に水が必要です！', 'error');
+                        resident.waterWarningShown = true;
                     }
                 }
                 break;

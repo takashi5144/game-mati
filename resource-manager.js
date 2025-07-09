@@ -301,7 +301,8 @@ class ResourceManager {
     
     // 種があるかチェック
     hasSeeds(seedType) {
-        return this.resources.seeds[seedType] > 0;
+        const seedCount = this.resources.seeds[seedType] || 0;
+        return seedCount > 0;
     }
 }
 

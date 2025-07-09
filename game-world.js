@@ -284,18 +284,18 @@ class GameWorld {
 
     updateProduction(deltaTime) {
         this.buildings.forEach(building => {
-            if (!building.isComplete || !building.config.production || !building.worker) return;
+            if (!building.isComplete) return;
+            
+            // 畑の場合は新しい状態システムで管理（ResidentAIが処理）
+            if (building.type === 'farm') {
+                // ResidentAIがタイマーを管理するのでここでは更新しない
+                return;
+            }
+            
+            // 他の建物の生産処理
+            if (!building.config.production || !building.worker) return;
             
             building.productionTimer += deltaTime;
-            
-            // 畑の作物成長アニメーション
-            if (building.type === 'farm') {
-                if (!building.growthStage) building.growthStage = 0;
-                building.growthStage = Math.min(1.0, building.growthStage + deltaTime / building.config.productionInterval);
-                
-                // 作物の成長を視覚的に更新
-                this.updateFarmGrowth(building);
-            }
             
             if (building.productionTimer >= building.config.productionInterval) {
                 building.productionTimer = 0;
@@ -308,23 +308,6 @@ class GameWorld {
                     } 
                 });
                 window.dispatchEvent(event);
-                
-                // 収穫エフェクト
-                if (building.type === 'farm') {
-                    const particles = this.voxelBuilder.createParticleEffect('harvest', {
-                        x: building.x,
-                        y: 0.5,
-                        z: building.z
-                    });
-                    particles.forEach(p => this.scene.add(p));
-                    
-                    setTimeout(() => {
-                        particles.forEach(p => this.scene.remove(p));
-                    }, 1000);
-                    
-                    // 作物をリセット
-                    building.growthStage = 0;
-                }
             }
         });
     }
