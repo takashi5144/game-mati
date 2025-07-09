@@ -30,6 +30,7 @@ class PixelFarmGame {
         
         this.voxelBuilder = new VoxelBuilder();
         this.realisticBuilder = new RealisticBuilder();
+        this.useRealisticMode = false; // 一時的にVoxelBuilderでテスト
         this.gameWorld = null;
         this.residentAI = null;
         this.resourceManager = null;
@@ -48,31 +49,33 @@ class PixelFarmGame {
     }
 
     init() {
-        // シーンの作成
-        this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.Fog(0x87CEEB, 20, 50);
-        
-        // カメラの設定（透視投影カメラ）
-        this.camera = new THREE.PerspectiveCamera(
-            45,
-            window.innerWidth / window.innerHeight,
-            0.1,
-            1000
-        );
-        this.camera.position.set(
-            GAME_CONFIG.CAMERA.POSITION.x,
-            GAME_CONFIG.CAMERA.POSITION.y,
-            GAME_CONFIG.CAMERA.POSITION.z
-        );
-        this.camera.lookAt(
-            GAME_CONFIG.CAMERA.LOOK_AT.x,
-            GAME_CONFIG.CAMERA.LOOK_AT.y,
-            GAME_CONFIG.CAMERA.LOOK_AT.z
-        );
-        
-        // カメラコントロールの初期化
-        const offset = new THREE.Vector3().subVectors(this.camera.position, this.cameraControls.target);
-        this.cameraControls.spherical.setFromVector3(offset);
+        try {
+            // シーンの作成
+            this.scene = new THREE.Scene();
+            this.scene.fog = new THREE.Fog(0x87CEEB, 50, 100);
+            this.scene.background = new THREE.Color(0x87CEEB);
+            
+            // カメラの設定（透視投影カメラ）
+            this.camera = new THREE.PerspectiveCamera(
+                45,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            this.camera.position.set(
+                GAME_CONFIG.CAMERA.POSITION.x,
+                GAME_CONFIG.CAMERA.POSITION.y,
+                GAME_CONFIG.CAMERA.POSITION.z
+            );
+            this.camera.lookAt(
+                GAME_CONFIG.CAMERA.LOOK_AT.x,
+                GAME_CONFIG.CAMERA.LOOK_AT.y,
+                GAME_CONFIG.CAMERA.LOOK_AT.z
+            );
+            
+            // カメラコントロールの初期化
+            const offset = new THREE.Vector3().subVectors(this.camera.position, this.cameraControls.target);
+            this.cameraControls.spherical.setFromVector3(offset);
         
         // レンダラーの設定
         this.renderer = new THREE.WebGLRenderer({ 
@@ -92,8 +95,12 @@ class PixelFarmGame {
         this.setupLighting();
         
         // ゲームオブジェクトの初期化
-        this.gameWorld = new GameWorld(this.scene, this.realisticBuilder);
-        this.residentAI = new ResidentAI(this.scene, this.realisticBuilder, this.gameWorld);
+        console.log('ゲームワールド初期化開始');
+        const builder = this.useRealisticMode ? this.realisticBuilder : this.voxelBuilder;
+        this.gameWorld = new GameWorld(this.scene, builder);
+        console.log('住民AI初期化開始');
+        this.residentAI = new ResidentAI(this.scene, builder, this.gameWorld);
+        console.log('リソースマネージャー初期化開始');
         this.resourceManager = new ResourceManager();
         
         // グローバル変数として公開（他のクラスから参照できるように）
@@ -119,6 +126,10 @@ class PixelFarmGame {
                 height: GAME_CONFIG.MAP.HEIGHT 
             } 
         });
+        } catch (error) {
+            console.error('ゲーム初期化エラー:', error);
+            alert('ゲームの初期化中にエラーが発生しました: ' + error.message);
+        }
     }
 
     setupLighting() {

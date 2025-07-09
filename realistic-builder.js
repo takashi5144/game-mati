@@ -17,6 +17,10 @@ class RealisticBuilder {
             color: options.color || 0xffffff,
             roughness: options.roughness || 0.7,
             metalness: options.metalness || 0.0,
+            emissive: options.emissive || 0x000000,
+            emissiveIntensity: options.emissiveIntensity || 0.0,
+            opacity: options.opacity !== undefined ? options.opacity : 1.0,
+            transparent: options.transparent || false
         };
 
         // テクスチャがある場合は適用
@@ -461,8 +465,8 @@ class RealisticBuilder {
         const group = new THREE.Group();
         const profConfig = GAME_CONFIG.PROFESSIONS[profession];
         
-        // 体（カプセル形状）
-        const bodyGeometry = new THREE.CapsuleGeometry(0.15, 0.5, 4, 8);
+        // 体（円柱で代用）
+        const bodyGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8);
         const bodyMaterial = this.createRealisticMaterial({
             color: profConfig.color,
             roughness: 0.8
@@ -485,8 +489,8 @@ class RealisticBuilder {
         head.receiveShadow = true;
         group.add(head);
 
-        // 腕
-        const armGeometry = new THREE.CapsuleGeometry(0.05, 0.3, 4, 8);
+        // 腕（円柱で代用）
+        const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 6);
         const armMaterial = bodyMaterial.clone();
         
         const armLeft = new THREE.Mesh(armGeometry, armMaterial);
@@ -501,8 +505,8 @@ class RealisticBuilder {
         armRight.castShadow = true;
         group.add(armRight);
 
-        // 脚
-        const legGeometry = new THREE.CapsuleGeometry(0.06, 0.35, 4, 8);
+        // 脚（円柱で代用）
+        const legGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.35, 6);
         const legMaterial = this.createRealisticMaterial({
             color: 0x000080,
             roughness: 0.8
@@ -584,7 +588,11 @@ class RealisticBuilder {
         eyeRight.position.set(0.05, 0.92, 0.13);
         group.add(eyeRight);
 
-        group.userData = { profession: profession, type: 'resident' };
+        group.userData = { 
+            profession: profession, 
+            type: 'resident',
+            residentId: null  // ResidentAIで設定される
+        };
         return group;
     }
 
